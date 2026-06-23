@@ -1,0 +1,19 @@
+﻿# deps
+node_modules/
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+# secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+# build
+dist/
+build/
+# editor
+.vscode/
+.idea/
