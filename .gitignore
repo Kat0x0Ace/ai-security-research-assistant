@@ -14,6 +14,10 @@ __pycache__/
 # build
 dist/
 build/
+# corpus: personal docs ignored; the curated sample-corpus ships in repo
+data/*
+!data/sample-corpus/
+cache/
 # editor
 .vscode/
 .idea/

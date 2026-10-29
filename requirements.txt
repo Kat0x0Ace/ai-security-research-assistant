@@ -1,6 +1,10 @@
-# --- Core: embeddings + vector DB + LLM ---
-google-genai>=1.0,<2
-pinecone>=5.0,<6
+# --- Embeddings (local) ---
+sentence-transformers>=3.0,<6
+
+# --- Vector DB (local) ---
+chromadb>=0.5,<2
+
+# --- LLM (Ollama via OpenAI-compatible client) ---
 openai>=1.50,<2
 
 # --- App + UI ---
@@ -8,6 +12,9 @@ streamlit>=1.40,<2
 python-dotenv>=1.0,<2
 
 # --- Ingestion ---
-httpx>=0.27,<1
-pillow>=10.0,<12
+pypdf>=4.0,<7
 tqdm>=4.66,<5
+
+# --- Evals + tests ---
+pyyaml>=6.0
+pytest>=8.0

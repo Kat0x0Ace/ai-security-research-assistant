@@ -1,0 +1,70 @@
+# Retrieval eval set: each case asks a question and names the sample-corpus
+# file that MUST appear in the top-3 retrieved sources for a pass.
+# Extend this file when the corpus grows — the eval runs on whatever data/ holds.
+
+name: sample-corpus-retrieval
+top_k: 3
+cases:
+  # prompt-injection-basics.md
+  - question: "What is prompt injection?"
+    expect_source: prompt-injection-basics.md
+  - question: "What is the difference between direct and indirect prompt injection?"
+    expect_source: prompt-injection-basics.md
+  - question: "Why do large language models fall for instructions hidden in data?"
+    expect_source: prompt-injection-basics.md
+  - question: "Which OWASP risk number is prompt injection?"
+    expect_source: prompt-injection-basics.md
+
+  # indirect-injection-rag-poisoning.md
+  - question: "How can an attacker poison a retrieval-augmented generation knowledge base?"
+    expect_source: indirect-injection-rag-poisoning.md
+  - question: "What is RAG poisoning?"
+    expect_source: indirect-injection-rag-poisoning.md
+  - question: "How can hidden instructions be planted in a PDF or markdown document?"
+    expect_source: indirect-injection-rag-poisoning.md
+  - question: "Does citation enforcement help against indirect prompt injection?"
+    expect_source: indirect-injection-rag-poisoning.md
+
+  # owasp-llm-top-10.md
+  - question: "What is excessive agency in LLM applications?"
+    expect_source: owasp-llm-top-10.md
+  - question: "What does improper output handling mean in the OWASP LLM Top 10?"
+    expect_source: owasp-llm-top-10.md
+  - question: "What is the OWASP risk about unbounded consumption?"
+    expect_source: owasp-llm-top-10.md
+  - question: "What is system prompt leakage?"
+    expect_source: owasp-llm-top-10.md
+  - question: "Which OWASP risk covers supply chain problems for LLMs?"
+    expect_source: owasp-llm-top-10.md
+
+  # jailbreaks-and-guardrails.md
+  - question: "What is a jailbreak in the context of large language models?"
+    expect_source: jailbreaks-and-guardrails.md
+  - question: "What role-play framing tricks do jailbreaks use?"
+    expect_source: jailbreaks-and-guardrails.md
+  - question: "How do multi-turn escalation jailbreaks work?"
+    expect_source: jailbreaks-and-guardrails.md
+  - question: "What defenses exist against jailbreaking a model?"
+    expect_source: jailbreaks-and-guardrails.md
+
+  # adversarial-machine-learning.md
+  - question: "What is an adversarial example?"
+    expect_source: adversarial-machine-learning.md
+  - question: "What is the difference between poisoning and evasion attacks?"
+    expect_source: adversarial-machine-learning.md
+  - question: "How does a model extraction attack work?"
+    expect_source: adversarial-machine-learning.md
+
+  # mitre-atlas-overview.md
+  - question: "What is MITRE ATLAS?"
+    expect_source: mitre-atlas-overview.md
+  - question: "How does MITRE ATLAS relate to the ATT&CK framework?"
+    expect_source: mitre-atlas-overview.md
+
+  # secure-rag-design.md
+  - question: "How should retrieved content be treated to mitigate prompt injection in RAG?"
+    expect_source: secure-rag-design.md
+  - question: "When should a RAG system refuse to answer?"
+    expect_source: secure-rag-design.md
+  - question: "Why is continuous retrieval evaluation important for RAG security?"
+    expect_source: secure-rag-design.md
