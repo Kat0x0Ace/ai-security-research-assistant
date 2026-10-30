@@ -104,6 +104,17 @@ streamlit run app.py
 
 ## Session log
 
+### 2026-10-30
+- Did: Got the local v2 stack running end to end. Redesigned the UI from an approved mockup: dossier theme, self-hosted fonts, right-aligned user bubbles, citation badges, sources panel with match bars, refusal callout, "Try asking" examples, knowledge-base index, model label, shield favicon. Speed: GPU fix, 3 passages instead of 5, streaming, background warm-up. Answers went from 40–97s to first words in about 3–5s. Added small-talk replies and calibrated the refusal cutoff (1.1 → 0.75), plus truncation of refuse-then-hallucinate output. Security: escape-first rendering, documents can no longer forge the `<untrusted>` wrapper, and a live red-team with an undefended control (result inconclusive, documented honestly). Also added CI, an MIT license, font OFL files, a README rewrite with screenshots and measured results, a screenshot script, and rewrote this CLAUDE.md. 47 tests pass; retrieval eval 96%. Branch `ui-redesign-and-hardening` pushed (3 commits).
+- Next: Open the repo's GitHub **Actions** tab, confirm the first CI run on `ui-redesign-and-hardening` is green (fix it if red), then open the PR and merge to `main`.
+- Parked: stronger red-team (poisoned passage ranked first; a less safety-tuned target model) · conversation memory (rewrite follow-ups into standalone questions) · hybrid search / re-ranking · Docker · optional "answer in 2–4 sentences" speed tweak (not approved yet) · before making the repo public, re-read this file and git history for personal details · set Ollama up on the Mac too (see Lessons learned).
+- Artifacts:
+  - Mockups: `mockups/ui-design.html` and `mockups/ui-copy-wireframe.html`. Open with `start mockups\ui-design.html` (Windows) or `open mockups/ui-design.html` (Mac).
+  - README screenshots: `docs/screenshots/*.png`. Regenerate with `python scripts/take_screenshots.py`.
+  - Red-team reports: `evals/injection_report.md` and `evals/injection_report_control.md`.
+- Secrets flagged: none
+- Drift check: Stayed on this project the whole session. Scope grew from "how do I run it" into UI redesign, speed and portfolio polish. Every step was approved, and it all served this project's presentation goal.
+
 ### 2026-05-26 — Phase 1 (foundation) built
 
 **Done**
@@ -115,10 +126,8 @@ streamlit run app.py
 - Wrote this CLAUDE.md
 
 **Next step**
-- You drop your three API keys into `.env`
-- Run the connectivity check: `python -c "from config import pinecone_index; print(pinecone_index.describe_index_stats())"`
-- If that prints index stats (likely `{'total_vector_count': 0, ...}`), Phase 1 is done and we move to Phase 2 (text ingest + chat)
+- OBSOLETE (2026-10-30): v1 (API keys, Pinecone) was replaced by the keyless local v2 stack.
 
 **Parked**
-- ffmpeg-on-PATH check vs bundling `imageio-ffmpeg` — decide when we get to Phase 4
-- Whether to keep Streamlit or upgrade to FastAPI + a polished frontend — defer until the RAG works end-to-end
+- DROPPED (2026-10-30): ffmpeg / video ingestion. The multimodal phases were dropped in v2.
+- DONE (2026-10-30): kept Streamlit, now with a custom theme (see `ui/`, `.streamlit/config.toml`). FastAPI + a custom frontend is no longer needed.
