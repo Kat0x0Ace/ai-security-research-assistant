@@ -156,6 +156,17 @@ class TestSafeRendering:
         out = sources_html([{"title": "<b>t</b>", "text": "<script>x</script>", "distance": 0.3}])
         assert "<script>" not in out and "<b>t</b>" not in out
 
+    def test_excerpt_drops_leading_title(self):
+        # Real chunks are single-line word windows (see ingest/chunker.py).
+        text = "# Prompt Injection Basics Prompt injection is an attack. ## Defenses Use layers."
+        out = sources_html([{"title": "Prompt Injection Basics", "text": text, "distance": 0.3}])
+        assert "Prompt Injection Basics Prompt injection" not in out
+        assert "Prompt injection is an attack. Defenses Use layers." in out
+
+    def test_excerpt_kept_when_no_title_prefix(self):
+        out = sources_html([{"title": "Prompt Injection Basics", "text": "a successful injection cannot do damage", "distance": 0.3}])
+        assert "a successful injection cannot do damage" in out
+
     def test_match_strength(self):
         assert match_strength(0.29)[0] == "strong match"
         assert match_strength(0.5)[0] == "good match"

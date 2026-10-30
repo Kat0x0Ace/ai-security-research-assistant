@@ -28,7 +28,7 @@ Every tuning decision below came from a measurement on this project, not a defau
 | Run on the **integrated GPU** | Ollama logs showed it detected the integrated GPU and then skipped it by default | Generation 9 → 18 tokens/s; answers 8–12s |
 | **Stream** answers + **warm up** models at launch | Time to first words; first question after launch | First words in ~3–5s. First question after launch 14s+ → 5.4s |
 
-Current numbers: **96% retrieval hit-rate** (24/25), **45 unit tests**, answers start appearing within a few seconds on integrated graphics (no discrete GPU needed).
+Current numbers: **96% retrieval hit-rate** (24/25), **47 unit tests**, answers start appearing within a few seconds on integrated graphics (no discrete GPU needed).
 
 ## Security model
 
@@ -104,7 +104,7 @@ To use your own documents, drop `.md`, `.txt` or `.pdf` files into `data/` and c
 ## Tests and evals
 
 ```bash
-pytest -q                                  # 45 unit tests: chunking, cache, refusal, streaming, escaping, injection guards
+pytest -q                                  # 47 unit tests: chunking, cache, refusal, streaming, escaping, injection guards
 python evals/run_eval.py                   # retrieval hit-rate, fails below 80% (CI gate)
 python evals/injection_eval.py             # live red-team (needs Ollama)
 python evals/injection_eval.py --control   # same attacks against a naive undefended prompt

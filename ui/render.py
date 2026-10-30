@@ -110,12 +110,22 @@ def match_strength(distance: float) -> tuple[str, int]:
     return label, width
 
 
+def _excerpt_text(text: str, title: str) -> str:
+    """Passage text for display. Chunks are single-line word windows, so the first
+    chunk of a file starts with "# <Title> ..."; drop the markdown markers and the
+    leading title (it's already shown above the excerpt)."""
+    excerpt = " ".join(text.replace("#", " ").split())
+    if title and excerpt.lower().startswith(title.lower()):
+        excerpt = excerpt[len(title):].lstrip()
+    return excerpt
+
+
 def sources_html(sources: list[dict]) -> str:
     """Numbered source rows. Each source: {"title", "text", "distance"}."""
     rows = []
     for i, src in enumerate(sources, start=1):
         label, width = match_strength(src["distance"])
-        excerpt = " ".join(src["text"].replace("#", " ").split())
+        excerpt = _excerpt_text(src["text"], src["title"])
         if len(excerpt) > EXCERPT_CHARS:
             excerpt = excerpt[:EXCERPT_CHARS].rsplit(" ", 1)[0] + "…"
         rows.append(
