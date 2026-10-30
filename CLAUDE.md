@@ -1,75 +1,106 @@
-# RAG Agent — multimodal RAG with Gemini Embedding 2 + Pinecone + OpenRouter
+# RAG Agent — AI Security Research Assistant
 
 ## What this is
 
-A personal multimodal RAG. Drop text, images, and videos in a local folder (or pass URLs), they get embedded with `gemini-embedding-2` and upserted to a single Pinecone index. A Streamlit chat UI lets you ask questions; retrieval hits all modalities at once and an OpenRouter LLM synthesizes the answer.
+A local, private RAG assistant that answers questions about AI security with citations, or an honest "I don't know". Embeddings, vector search and the LLM all run on the user's machine: no API keys, no data leaves it. It's a **portfolio project**, so the README, tests and measured results matter as much as the features.
 
-Why this works now: Gemini Embedding 2 is natively multimodal — text, image, video, and audio share one embedding space. Cross-modal retrieval works out of the box, no CLIP-and-text pairing.
+Core loop: ask a question → get a cited answer in a few seconds → open the sources to check them.
+
+> v1 (Gemini Embedding 2 + Pinecone + OpenRouter, multimodal plan) was replaced by this fully local v2. The old multimodal phases are dropped, not pending.
 
 ## Stack
 
-- **Embeddings**: Gemini Embedding 2 (`gemini-embedding-2`), MRL-truncated to **1536 dims**
-- **Vector DB**: Pinecone serverless (AWS us-east-1), cosine metric
-- **LLM**: OpenRouter (default: `anthropic/claude-sonnet-4.6`, swappable via `.env`)
-- **UI**: Streamlit chat (will be added in Phase 2)
-- **Lang**: Python 3.11+
+- **Embeddings**: sentence-transformers `all-MiniLM-L6-v2` (384-dim), local CPU
+- **Vector DB**: ChromaDB persistent client (`cache/chroma`), cosine
+- **LLM**: Ollama `llama3.1:8b` through its OpenAI-compatible endpoint (swappable via `.env`)
+- **UI**: Streamlit 1.66, custom "analyst's dossier" theme, fonts self-hosted in `static/fonts`
+- **Tests**: pytest, retrieval eval, live prompt-injection red-team; GitHub Actions CI
+- **Lang**: Python 3.11+ (developed on 3.14, CI on 3.12)
 
 ## Architecture in one paragraph
 
-`config.py` is the single source of truth for env vars and client singletons (Gemini, Pinecone, OpenRouter — all lazy-initialized). `ingest/embedder.py` is the only place that calls Gemini for embeddings. `ingest/cache.py` is a SQLite cache keyed by content hash so re-ingestion is cheap. The ingestion pipeline (Phase 2+) chunks/loads content, embeds it via the cached embedder, and upserts to Pinecone. The RAG layer (Phase 2) embeds the query, retrieves top-k, and calls OpenRouter with the retrieved snippets as context.
+`config.py` holds settings and lazy singletons (embedding model behind a lock, Chroma, Ollama client). `ingest/` loads txt/md/pdf → chunks into single-line word windows → embeds (SQLite cache) → upserts to Chroma. `rag.py` runs a turn: small talk gets a canned reply; otherwise retrieve top-k → refuse if the closest passage is farther than the cutoff → wrap passages as untrusted data → call the LLM (`answer()` or streamed `stream_answer()`) → truncate refuse-then-hallucinate output. `ui/render.py` escapes all untrusted text **first**, then adds citation badges; `ui/sidebar.py` and `ui/knowledge_base.py` build the sidebar; `app.py` only wires these together. `warmup.py` loads the embedding model and LLM in the background at launch.
 
 ## Project layout
 
 ```
-RAG Agent/
-├── .env                  # your real keys (gitignored)
-├── .env.example          # placeholders (committed)
-├── .gitignore
-├── requirements.txt
-├── config.py             # env + client singletons
-├── ingest/
-│   ├── __init__.py
-│   ├── embedder.py       # Gemini Embedding 2 wrapper
-│   └── cache.py          # SQLite embedding cache
-├── data/                 # drop your files here (gitignored)
-└── cache/                # SQLite cache (gitignored)
+app.py                  # Streamlit entry point (wiring only)
+rag.py                  # small talk -> retrieve -> refusal gate -> cited answer (sync + streamed)
+config.py               # .env settings + lazy singletons
+warmup.py               # background warm-up at launch
+ingest/                 # loader, chunker, embedder, cache, pipeline
+ui/                     # render.py (escape-first HTML), sidebar.py, knowledge_base.py, styles.css
+.streamlit/config.toml  # theme + font faces + static serving
+static/fonts/           # self-hosted fonts + their OFL licenses
+evals/                  # run_eval.py (retrieval, CI gate), injection_eval.py (live red-team) + reports
+tests/                  # unit tests (no LLM needed)
+scripts/                # take_screenshots.py (Playwright, dev-only)
+docs/screenshots/       # README images
+mockups/                # approved design mockups
+data/sample-corpus/     # AI-security sample documents
 ```
 
-Phase 2+ adds `ingest/chunker.py`, `ingest/loader.py`, `ingest/pipeline.py`, `search.py`, `rag.py`, `app.py`.
+## Status
 
-## Phases (build one at a time)
-
-- ✅ **Phase 1** — Foundation: env, config, embedder, cache, index auto-create
-- ⏳ **Phase 2** — Text ingest + chat (text files, retrieval, OpenRouter, Streamlit)
-- ⏳ **Phase 3** — Images
-- ⏳ **Phase 4** — Video (ffmpeg splitter, ≤110s clips)
-- ⏳ **Phase 5** — URLs (with SSRF + MIME guards)
-- ⏳ **Phase 6** — Polish
-
-Full plan: `~/.claude/plans/https-blog-google-innovation-and-ai-mode-crystalline-wave.md`
+- ✅ Local v2 stack, text ingest (txt/md/pdf), chat with citations + refusal
+- ✅ UI redesign, streaming, warm-up, small-talk handling, calibrated refusal cutoff
+- ✅ Prompt-injection hardening, CI, README with screenshots + measured results, MIT license
+- ⏳ Stronger red-team (poisoned passage ranked first; less safety-tuned target model)
+- ⏳ Conversation memory (rewrite follow-ups into standalone questions)
+- ⏳ Hybrid search (BM25 + vectors) / re-ranking, Docker
 
 ## How to run
 
+Needs Python 3.11+ and [Ollama](https://ollama.com) with `ollama pull llama3.1:8b`.
+
+**Windows (PowerShell)**
 ```powershell
-# One-time setup
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-
-# Fill in your 3 keys in .env (Pinecone, Gemini, OpenRouter)
-
-# Phase 1 connectivity check
-python -c "from config import pinecone_index; print(pinecone_index.describe_index_stats())"
+python evals/run_eval.py --reingest   # first time: builds the index
+streamlit run app.py
 ```
 
-The connectivity check auto-creates the Pinecone index on first run.
+**Mac**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python evals/run_eval.py --reingest
+streamlit run app.py
+```
 
-## Security posture (recap)
+**Tests and evals:**
+- `pytest -q`
+- `python evals/run_eval.py` (must stay ≥ 80%)
+- `python evals/injection_eval.py [--control]` (needs Ollama)
 
-- `.env` is gitignored; only `.env.example` is committed
-- All keys read via env, never hardcoded
-- Retrieved content will be wrapped as untrusted data in LLM context (prompt-injection mitigation) — implemented in Phase 2
-- URL ingestion will have SSRF guards (private-IP block, scheme allowlist, size cap) — implemented in Phase 5
+**Screenshots:** `pip install playwright`, then `python scripts/take_screenshots.py`. It uses Edge on Windows; on Mac run `playwright install chromium` and pass `--browser chromium`.
+
+## Key settings (`.env`, see `.env.example`)
+
+- `RETRIEVAL_MAX_DISTANCE=0.75`: calibrated. Eval questions score 0.25–0.69 and off-topic messages 0.84–0.96. Re-measure if the corpus or embedding model changes.
+- `LLM_TOP_K=3`: was 5. Reading 5 passages roughly tripled latency with no quality gain.
+- `OLLAMA_MODEL=llama3.1:8b`: don't swap to a smaller model without re-running the refusal checks (see lessons).
+
+## Security posture
+
+- No secrets: the stack is keyless. `.env` is still gitignored.
+- Retrieved passages are wrapped in `<untrusted>` tags. Delimiters inside documents are neutralised (`rag._neutralize`).
+- All model output, excerpts and titles are HTML-escaped before display. Markdown links and images never render (exfiltration guard).
+- Off-topic questions never reach the LLM. Refuse-then-answer output is truncated, including while streaming.
+- The live red-team was **inconclusive**: the undefended control resisted too. Don't claim the prompt layer "stops" attacks; the unit tests are the proof.
+- **This file is tracked in git:** no personal info, usernames, paths or device details in it or in the session log.
+
+## Lessons learned (so they don't bite twice)
+
+- **Smaller models can break the honesty guarantee.** `llama3.2:3b` refused and then answered from memory anyway. Speed changes need a quality check, not just a timing check.
+- **Ollama skips integrated GPUs by default.** Set `OLLAMA_IGPU_ENABLE=1` (and `OLLAMA_KEEP_ALIVE=30m` to avoid reload pauses), then restart Ollama. Check the result with `ollama ps` (PROCESSOR column).
+- **Windows Smart App Control can block a freshly installed native wheel once** ("An Application Control policy has blocked this file"). Retrying and restarting Streamlit worked. Don't disable Smart App Control.
+- **Chunks are single-line word windows.** Text processing that assumes line breaks (e.g. "drop heading lines") silently breaks. Test with real chunk text.
+- **A red-team needs a control run.** Without one, a 100% pass rate says nothing about your defenses.
+- **Rendering LLM output as HTML is only safe escape-first.** Never pass model text to `st.markdown` as markdown.
 
 ## Session log
 
