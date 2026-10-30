@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # The default Linux torch wheel bundles multi-GB CUDA libraries; CI only needs CPU.
+      - name: Install CPU-only PyTorch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Unit tests (chunking, cache, refusal, streaming, escaping, injection guards)
+        run: pytest -q
+
+      - name: Retrieval eval (fails below 80% hit-rate)
+        run: python evals/run_eval.py --reingest

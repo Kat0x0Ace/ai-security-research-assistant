@@ -1,0 +1,55 @@
+# "Analyst's dossier" theme. Fonts are served from ./static/fonts so the app
+# makes no requests to Google Fonts (keeps the "nothing leaves this machine" promise).
+
+[server]
+enableStaticServing = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#d9a441"
+backgroundColor = "#0c0e12"
+secondaryBackgroundColor = "#12151b"
+textColor = "#ebe6dc"
+borderColor = "#252a35"
+linkColor = "#d9a441"
+baseRadius = "10px"
+font = "IBM Plex Sans"
+headingFont = "Fraunces"
+codeFont = "IBM Plex Mono"
+
+[theme.sidebar]
+backgroundColor = "#12151b"
+secondaryBackgroundColor = "#181c24"
+
+[[theme.fontFaces]]
+family = "Fraunces"
+url = "app/static/fonts/Fraunces-var.woff2"
+weight = "500 600"
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/fonts/IBMPlexSans-400.woff2"
+weight = 400
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/fonts/IBMPlexSans-500.woff2"
+weight = 500
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/fonts/IBMPlexSans-600.woff2"
+weight = 600
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "app/static/fonts/IBMPlexMono-400.woff2"
+weight = 400
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "app/static/fonts/IBMPlexMono-500.woff2"
+weight = 500

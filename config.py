@@ -14,6 +14,7 @@ v2 stack (free + local, nothing leaves your machine):
 from __future__ import annotations
 
 import os
+import threading
 from functools import cache
 from pathlib import Path
 
@@ -40,7 +41,7 @@ OLLAMA_MODEL = _get("OLLAMA_MODEL", "llama3.1:8b")
 OLLAMA_API_KEY = _get("OLLAMA_API_KEY", "ollama")
 
 # --- Retrieval / answering ---
-RETRIEVAL_MAX_DISTANCE = float(_get("RETRIEVAL_MAX_DISTANCE", "1.1"))
+RETRIEVAL_MAX_DISTANCE = float(_get("RETRIEVAL_MAX_DISTANCE", "0.75"))
 
 # --- App ---
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -56,12 +57,24 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
-@cache
-def get_embedding_model():
-    """Lazy singleton for the local sentence-transformers model."""
-    from sentence_transformers import SentenceTransformer
+_embedding_model = None
+_embedding_lock = threading.Lock()
 
-    return SentenceTransformer(EMBEDDING_MODEL)
+
+def get_embedding_model():
+    """Lazy singleton for the local sentence-transformers model.
+
+    Locked because the app warms it up on a background thread (see warmup.py);
+    a question arriving mid-warm-up waits for that load instead of starting a second one.
+    """
+    global _embedding_model
+    if _embedding_model is None:
+        with _embedding_lock:
+            if _embedding_model is None:
+                from sentence_transformers import SentenceTransformer
+
+                _embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+    return _embedding_model
 
 
 @cache
