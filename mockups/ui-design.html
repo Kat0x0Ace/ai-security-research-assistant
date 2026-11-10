@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Design mockup — AI Security Research Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0e12;
+    --panel: #12151b;
+    --panel-2: #181c24;
+    --line: #252a35;
+    --text: #ebe6dc;
+    --muted: #8d939f;
+    --faint: #5c6270;
+    --amber: #d9a441;
+    --amber-soft: rgba(217, 164, 65, 0.12);
+    --teal: #5fb39a;
+    --clay: #c9734f;
+    --clay-soft: rgba(201, 115, 79, 0.10);
+    --serif: "Fraunces", Georgia, serif;
+    --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans);
+    font-size: 16px; line-height: 1.6;
+    background-image:
+      radial-gradient(1200px 500px at 70% -10%, rgba(217,164,65,0.07), transparent 60%),
+      linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: auto, 32px 32px, 32px 32px;
+  }
+
+  /* Mockup-only state switcher */
+  .switch { position: fixed; bottom: 18px; right: 18px; z-index: 10; display: flex; gap: 6px;
+    background: var(--panel-2); border: 1px solid var(--line); padding: 6px; border-radius: 10px; font-family: var(--mono); font-size: 12px; }
+  .switch button { background: transparent; color: var(--muted); border: 0; padding: 6px 10px; border-radius: 6px; cursor: pointer; font: inherit; }
+  .switch button.on { background: var(--amber-soft); color: var(--amber); }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  aside { width: 320px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--line);
+    padding: 36px 26px; display: flex; flex-direction: column; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+  aside h2 { font-family: var(--serif); font-weight: 500; font-size: 26px; margin: 6px 0 2px; letter-spacing: -0.01em; }
+  .stats { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 22px; }
+  .stats b { color: var(--text); font-weight: 500; }
+  .index { list-style: none; margin: 0; padding: 0; counter-reset: doc; }
+  .index li { counter-increment: doc; display: grid; grid-template-columns: 30px 1fr; gap: 4px;
+    padding: 11px 0; border-top: 1px solid var(--line); font-size: 14.5px; line-height: 1.4; }
+  .index li:last-child { border-bottom: 1px solid var(--line); }
+  .index li::before { content: counter(doc, decimal-leading-zero); font-family: var(--mono); font-size: 11.5px; color: var(--amber); padding-top: 2px; }
+  .rebuild { margin-top: 24px; width: 100%; background: transparent; color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; font: 500 14px var(--sans); cursor: pointer; transition: border-color .2s, background .2s; }
+  .rebuild:hover { border-color: var(--amber); background: var(--amber-soft); }
+  .hint { font-size: 12.5px; color: var(--faint); margin-top: 8px; }
+  .local { margin-top: auto; padding-top: 28px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 3px rgba(95,179,154,0.15); }
+
+  /* ---------- Main ---------- */
+  main { flex: 1; display: flex; justify-content: center; padding: 64px 48px 140px; }
+  .col { width: 100%; max-width: 760px; }
+  header .eyebrow { display: flex; gap: 10px; align-items: center; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: 46px; line-height: 1.05; letter-spacing: -0.02em; margin: 14px 0 14px; }
+  h1 em { font-style: normal; color: var(--amber); }
+  .lede { color: var(--muted); font-size: 16.5px; max-width: 620px; margin: 0; }
+  .lede strong { color: var(--text); font-weight: 500; }
+  .rule { height: 1px; background: var(--line); margin: 36px 0; }
+
+  /* Empty state */
+  .try h3 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); font-weight: 400; margin: 0 0 14px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .q { text-align: left; background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 10px;
+    padding: 14px 16px; font: 15px/1.4 var(--sans); cursor: pointer; transition: border-color .2s, transform .2s, background .2s; display: flex; justify-content: space-between; gap: 10px; }
+  .q span { color: var(--faint); font-family: var(--mono); transition: color .2s, transform .2s; }
+  .q:hover { border-color: rgba(217,164,65,0.5); background: var(--panel-2); transform: translateY(-1px); }
+  .q:hover span { color: var(--amber); transform: translateX(2px); }
+
+  /* Messages */
+  .msg { display: grid; grid-template-columns: 34px 1fr; gap: 16px; margin-bottom: 30px; }
+  .av { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; font-family: var(--mono); font-size: 12px; font-weight: 500; }
+  .bot .av { background: var(--amber-soft); border: 1px solid rgba(217,164,65,0.35); color: var(--amber); }
+  /* User messages: right-aligned "paper note" bubbles, iMessage-style */
+  .msg.user { display: flex; justify-content: flex-end; margin-bottom: 22px; }
+  .user .body { max-width: 72%; background: #e6dfd1; color: #17140f; font-size: 16px; line-height: 1.45;
+    padding: 10px 16px; border-radius: 18px 18px 4px 18px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+  .bot .body { padding-top: 4px; }
+  .cite { display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--amber);
+    background: var(--amber-soft); border: 1px solid rgba(217,164,65,0.3); border-radius: 4px; padding: 0 5px; margin: 0 1px; line-height: 17px; vertical-align: 1px; }
+
+  details.sources { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  details.sources summary { cursor: pointer; list-style: none; padding: 11px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  details.sources summary::-webkit-details-marker { display: none; }
+  details.sources summary::before { content: "›"; transition: transform .2s; display: inline-block; color: var(--amber); }
+  details[open].sources summary::before { transform: rotate(90deg); }
+  .src { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line); align-items: start; }
+  .src .n { font-family: var(--mono); font-size: 12px; color: var(--amber); }
+  .src .t { font-size: 14px; font-weight: 500; }
+  .src .x { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+  .match { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; }
+  .bar { width: 64px; height: 4px; background: var(--line); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--teal); }
+
+  .refusal { border: 1px solid rgba(201,115,79,0.35); background: var(--clay-soft); border-radius: 10px; padding: 14px 16px; }
+  .refusal .tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--clay); margin-bottom: 4px; }
+  .refusal p { margin: 0; color: var(--text); }
+
+  /* Input */
+  .input { position: fixed; bottom: 0; left: 320px; right: 0; padding: 18px 48px 26px; background: linear-gradient(transparent, var(--bg) 35%); display: flex; justify-content: center; }
+  .field { width: 100%; max-width: 760px; display: flex; align-items: center; gap: 12px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px 14px 14px 18px; color: var(--faint); box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+  .field .send { margin-left: auto; width: 32px; height: 32px; border-radius: 8px; background: var(--amber); color: #1a1408; display: grid; place-items: center; font-weight: 600; }
+
+  /* Load choreography */
+  .rise { opacity: 0; transform: translateY(8px); animation: rise .55s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .d1 { animation-delay: .05s } .d2 { animation-delay: .15s } .d3 { animation-delay: .25s } .d4 { animation-delay: .35s }
+
+  .state { display: none; } .state.on { display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="eyebrow">Knowledge base</div>
+    <h2>What I know</h2>
+    <div class="stats"><b>7</b> documents · <b>12</b> passages</div>
+    <ul class="index">
+      <li>Adversarial Machine Learning</li>
+      <li>Building Secure RAG Systems</li>
+      <li>Indirect Prompt Injection &amp; RAG Poisoning</li>
+      <li>Jailbreaks and Guardrails</li>
+      <li>MITRE ATLAS Overview</li>
+      <li>OWASP Top 10 for LLM Applications</li>
+      <li>Prompt Injection Basics</li>
+    </ul>
+    <button class="rebuild">↻ Rebuild knowledge base</button>
+    <div class="hint">Added or changed files in data/? Rebuild to include them.</div>
+    <div class="local"><span class="dot"></span> Running locally · nothing leaves this machine</div>
+  </aside>
+
+  <main>
+    <div class="col">
+      <header>
+        <h1 class="rise d2">AI Security <em>Research</em> Assistant</h1>
+        <p class="lede rise d3">Ask about <strong>prompt injection, jailbreaks, RAG poisoning, the OWASP LLM Top 10 and MITRE ATLAS</strong>. Every answer points to the document it came from. If something isn’t in the knowledge base, I’ll say so.</p>
+      </header>
+      <div class="rule"></div>
+
+      <!-- STATE 1: empty -->
+      <section class="state on" id="s-empty">
+        <div class="try rise d4">
+          <h3>Try asking</h3>
+          <div class="grid">
+            <button class="q">What is indirect prompt injection? <span>→</span></button>
+            <button class="q">How do multi-turn jailbreaks work? <span>→</span></button>
+            <button class="q">What is MITRE ATLAS? <span>→</span></button>
+            <button class="q">How should a RAG system treat retrieved content? <span>→</span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- STATE 2: conversation -->
+      <section class="state" id="s-chat">
+        <div class="msg user"><div class="body">What is indirect prompt injection?</div></div>
+
+        <div class="msg bot">
+          <div class="av"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="2.6" r="1.6"/><rect x="11.2" y="3.5" width="1.6" height="3"/><rect x="4" y="6.5" width="16" height="12" rx="4"/><rect x="1.5" y="10" width="2" height="5" rx="1"/><rect x="20.5" y="10" width="2" height="5" rx="1"/><circle cx="9" cy="12" r="1.7" fill="#0c0e12"/><circle cx="15" cy="12" r="1.7" fill="#0c0e12"/><rect x="9" y="15.2" width="6" height="1.4" rx=".7" fill="#0c0e12"/><rect x="7" y="19.5" width="10" height="3" rx="1.2"/></svg></div>
+          <div class="body">
+            Indirect prompt injection is when an attacker plants malicious instructions somewhere the model will later read them — a web page, a PDF, an email, or a document in a RAG knowledge base <span class="cite">1</span>. Unlike direct injection, the attacker never types into the chat themselves <span class="cite">1</span>. RAG poisoning is a specific form of it, where the knowledge base is seeded with documents carrying hidden instructions <span class="cite">3</span>.
+            <details class="sources" open>
+              <summary>3 sources</summary>
+              <div class="src"><div class="n">[1]</div><div><div class="t">Prompt Injection Basics</div><div class="x">Indirect prompt injection occurs when an attacker plants malicious instructions in a location where the model will later read them…</div></div><div class="match">strong match<div class="bar"><i style="width:86%"></i></div></div></div>
+              <div class="src"><div class="n">[2]</div><div><div class="t">Prompt Injection Basics</div><div class="x">It is considered one of the most important open problems in LLM security because no complete defense is known…</div></div><div class="match">good match<div class="bar"><i style="width:70%"></i></div></div></div>
+              <div class="src"><div class="n">[3]</div><div><div class="t">Indirect Prompt Injection &amp; RAG Poisoning</div><div class="x">RAG poisoning seeds the knowledge base with documents containing hidden instructions…</div></div><div class="match">good match<div class="bar"><i style="width:64%"></i></div></div></div>
+            </details>
+          </div>
+        </div>
+
+        <div class="msg user"><div class="body">thanks!</div></div>
+        <div class="msg bot"><div class="av"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="2.6" r="1.6"/><rect x="11.2" y="3.5" width="1.6" height="3"/><rect x="4" y="6.5" width="16" height="12" rx="4"/><rect x="1.5" y="10" width="2" height="5" rx="1"/><rect x="20.5" y="10" width="2" height="5" rx="1"/><circle cx="9" cy="12" r="1.7" fill="#0c0e12"/><circle cx="15" cy="12" r="1.7" fill="#0c0e12"/><rect x="9" y="15.2" width="6" height="1.4" rx=".7" fill="#0c0e12"/><rect x="7" y="19.5" width="10" height="3" rx="1.2"/></svg></div><div class="body">You’re welcome! Ask me anything else about the topics in the knowledge base.</div></div>
+
+        <div class="msg user"><div class="body">What’s the capital of France?</div></div>
+        <div class="msg bot">
+          <div class="av"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="2.6" r="1.6"/><rect x="11.2" y="3.5" width="1.6" height="3"/><rect x="4" y="6.5" width="16" height="12" rx="4"/><rect x="1.5" y="10" width="2" height="5" rx="1"/><rect x="20.5" y="10" width="2" height="5" rx="1"/><circle cx="9" cy="12" r="1.7" fill="#0c0e12"/><circle cx="15" cy="12" r="1.7" fill="#0c0e12"/><rect x="9" y="15.2" width="6" height="1.4" rx=".7" fill="#0c0e12"/><rect x="7" y="19.5" width="10" height="3" rx="1.2"/></svg></div>
+          <div class="body">
+            <div class="refusal">
+              <div class="tag">Outside the knowledge base</div>
+              <p>I don’t have material on that, so I won’t guess. I can answer questions about the topics listed on the left.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="input"><div class="field">Ask about AI security…<span class="send">↑</span></div></div>
+
+<div class="switch">
+  <button id="b-empty" class="on" onclick="show('empty')">Empty state</button>
+  <button id="b-chat" onclick="show('chat')">Conversation</button>
+</div>
+
+<script>
+  function show(s) {
+    document.getElementById("s-empty").classList.toggle("on", s === "empty");
+    document.getElementById("s-chat").classList.toggle("on", s === "chat");
+    document.getElementById("b-empty").classList.toggle("on", s === "empty");
+    document.getElementById("b-chat").classList.toggle("on", s === "chat");
+  }
+</script>
+</body>
+</html>

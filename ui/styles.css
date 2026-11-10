@@ -1,0 +1,150 @@
+/* "Analyst's dossier" styling layered on top of the theme in .streamlit/config.toml.
+   Colours/fonts that the theme can express live there; this file only adds what
+   the theme can't (layout, custom HTML blocks, atmosphere). */
+
+:root {
+  --bg: #0c0e12;
+  --panel: #12151b;
+  --panel-2: #181c24;
+  --line: #252a35;
+  --text: #ebe6dc;
+  --muted: #8d939f;
+  --faint: #5c6270;
+  --amber: #d9a441;
+  --amber-soft: rgba(217, 164, 65, 0.12);
+  --teal: #5fb39a;
+  --clay: #c9734f;
+  --clay-soft: rgba(201, 115, 79, 0.10);
+  --serif: "Fraunces", Georgia, serif;
+  --mono: "IBM Plex Mono", Consolas, monospace;
+}
+
+/* ---------- Atmosphere ---------- */
+.stApp {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1200px 500px at 70% -10%, rgba(217, 164, 65, 0.07), transparent 60%),
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+}
+[data-testid="stHeader"] { background: transparent; }
+[data-testid="stAppDeployButton"] { display: none; }
+[data-testid="stMainBlockContainer"] { max-width: 820px; padding-top: 4rem; padding-bottom: 8rem; }
+[data-testid="stSidebar"] { border-right: 1px solid var(--line); }
+
+/* ---------- Shared bits ---------- */
+.eyebrow {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--faint);
+}
+.rise { opacity: 0; transform: translateY(8px); animation: rise .55s cubic-bezier(.2, .7, .2, 1) forwards; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+.d2 { animation-delay: .1s } .d3 { animation-delay: .2s }
+
+/* ---------- Header ---------- */
+.app-title {
+  font-family: var(--serif); font-weight: 600; font-size: 46px; line-height: 1.05;
+  letter-spacing: -0.02em; margin: 0 0 14px; color: var(--text);
+}
+.app-title em { font-style: normal; color: var(--amber); }
+.app-lede { color: var(--muted); font-size: 16.5px; max-width: 620px; margin: 0; line-height: 1.6; }
+.app-lede strong { color: var(--text); font-weight: 500; }
+.app-rule { height: 1px; background: var(--line); margin: 32px 0 28px; }
+
+/* ---------- "Try asking" example questions ---------- */
+.st-key-try-asking button {
+  justify-content: flex-start; text-align: left; min-height: 56px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--text); padding: 12px 16px;
+  transition: border-color .2s, transform .2s, background .2s;
+}
+.st-key-try-asking button:hover {
+  border-color: rgba(217, 164, 65, 0.5); background: var(--panel-2);
+  color: var(--text); transform: translateY(-1px);
+}
+.st-key-try-asking button > div { justify-content: flex-start; width: 100%; }
+.st-key-try-asking button p { font-size: 15px; line-height: 1.4; text-align: left; }
+
+/* ---------- User messages: right-aligned "paper note" bubbles ---------- */
+.user-row { display: flex; justify-content: flex-end; margin: 6px 0 22px; }
+.user-bubble {
+  max-width: 72%; background: #e6dfd1; color: #17140f; font-size: 16px; line-height: 1.45;
+  padding: 10px 16px; border-radius: 18px 18px 4px 18px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); overflow-wrap: anywhere;
+}
+
+/* ---------- Assistant messages ---------- */
+[data-testid="stChatMessage"] { background: transparent; padding-left: 0; gap: 16px; }
+[data-testid="stChatMessage"] [data-testid^="stChatMessageAvatar"] {
+  background: var(--amber-soft); border: 1px solid rgba(217, 164, 65, 0.35);
+  color: var(--amber); border-radius: 8px;
+}
+.answer { font-size: 16px; line-height: 1.65; }
+.answer p { margin: 0 0 0.8em; }
+.answer p:last-child { margin-bottom: 0; }
+.answer ul, .answer ol { margin: 0 0 0.8em; padding-left: 1.3em; }
+.cite {
+  display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--amber); background: var(--amber-soft); border: 1px solid rgba(217, 164, 65, 0.3);
+  border-radius: 4px; padding: 0 5px; margin: 0 1px; line-height: 17px; vertical-align: 1px;
+}
+
+/* "Reading N sources…" indicator before the first words stream in */
+.thinking { display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 12px; color: var(--muted); padding-top: 6px; }
+.thinking span { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); animation: pulse 1.2s infinite ease-in-out; }
+.thinking span:nth-child(2) { animation-delay: .15s; }
+.thinking span:nth-child(3) { animation-delay: .3s; margin-right: 6px; }
+@keyframes pulse { 0%, 80%, 100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: none; } }
+
+/* Sources expander */
+[data-testid="stChatMessage"] [data-testid="stExpander"] details {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+}
+[data-testid="stChatMessage"] [data-testid="stExpander"] summary p {
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+}
+.src { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
+.src:first-child { border-top: 0; padding-top: 0; }
+.src .n { font-family: var(--mono); font-size: 12px; color: var(--amber); }
+.src .t { font-size: 14px; font-weight: 500; color: var(--text); }
+.src .x { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.match { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; }
+.bar { width: 64px; height: 4px; background: var(--line); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--teal); }
+
+/* Refusal + error callouts */
+.refusal, .app-error { border-radius: 10px; padding: 14px 16px; }
+.refusal { border: 1px solid rgba(201, 115, 79, 0.35); background: var(--clay-soft); }
+.app-error { border: 1px solid rgba(201, 115, 79, 0.6); background: rgba(201, 115, 79, 0.18); }
+.refusal .tag, .app-error .tag {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--clay); margin-bottom: 4px;
+}
+.refusal p, .app-error p { margin: 0; color: var(--text); }
+
+/* ---------- Chat input ---------- */
+[data-testid="stChatInput"] {
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- Sidebar ---------- */
+.kb-title { font-family: var(--serif); font-weight: 500; font-size: 26px; margin: 6px 0 2px; letter-spacing: -0.01em; color: var(--text); }
+.kb-stats { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+.kb-stats b { color: var(--text); font-weight: 500; }
+.kb-index { list-style: none; margin: 0; padding: 0; counter-reset: doc; }
+.kb-index li {
+  counter-increment: doc; display: grid; grid-template-columns: 30px 1fr; gap: 4px;
+  padding: 10px 0; margin: 0; border-top: 1px solid var(--line); font-size: 14.5px; line-height: 1.4;
+}
+.kb-index li:last-child { border-bottom: 1px solid var(--line); }
+.kb-index li::before { content: counter(doc, decimal-leading-zero); font-family: var(--mono); font-size: 11.5px; color: var(--amber); padding-top: 2px; }
+.kb-empty { color: var(--muted); font-size: 14px; }
+.st-key-rebuild { margin-top: 18px; }
+.st-key-rebuild button { background: transparent; border: 1px solid var(--line); border-radius: 8px; }
+.st-key-rebuild button:hover { border-color: var(--amber); background: var(--amber-soft); color: var(--text); }
+.kb-hint { font-size: 12.5px; color: var(--faint); margin-top: -4px; }
+.kb-local { margin-top: 36px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.kb-model { margin-top: 8px; padding-left: 15px; font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+.kb-model b { color: var(--amber); font-weight: 500; }
+.kb-local .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 3px rgba(95, 179, 154, 0.15); flex-shrink: 0; }

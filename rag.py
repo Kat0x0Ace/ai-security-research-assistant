@@ -15,6 +15,8 @@ instructions found inside it — prompt-injection mitigation.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 from config import LLM_TEMPERATURE, LLM_TOP_K, OLLAMA_MODEL, RETRIEVAL_MAX_DISTANCE, get_collection, get_llm_client
@@ -39,6 +41,36 @@ _SYSTEM_PROMPT = (
 )
 
 
+# Small talk ("thanks!", "hi", "ok cool") is answered directly instead of being
+# run through retrieval — otherwise it gets matched to random passages.
+# Only messages made up ENTIRELY of these phrases count; anything else is a question.
+_SMALL_TALK_REPLIES = {
+    "thanks": "You're welcome! Ask me anything else about the topics in the knowledge base.",
+    "bye": "Goodbye! Come back any time you have a question.",
+    "greeting": "Hi! Ask me about any of the topics in the knowledge base.",
+    "ack": "Glad that helped. Anything else you'd like to know?",
+}
+_SMALL_TALK_PATTERNS = {
+    "thanks": r"thanks?|thank you|thx|ty|cheers|much appreciated|appreciate it",
+    "bye": r"bye|goodbye|see you|see ya|cya",
+    "greeting": r"hi|hello|hey|hiya|good (?:morning|afternoon|evening)",
+    "ack": r"ok|okay|cool|nice|great|got it|perfect|awesome|sounds good",
+}
+_ANY_SMALL_TALK = "|".join(_SMALL_TALK_PATTERNS.values())
+_SMALL_TALK_RE = re.compile(rf"^(?:(?:{_ANY_SMALL_TALK})(?:\s+(?:so much|a lot|again|there))?[\s,!.:)]*)+$")
+
+
+def small_talk_reply(query: str) -> str | None:
+    """Return a canned reply if the message is pure small talk, else None."""
+    text = query.strip().lower()
+    if not text or len(text) > 60 or not _SMALL_TALK_RE.match(text):
+        return None
+    for kind, pattern in _SMALL_TALK_PATTERNS.items():  # dict order = priority
+        if re.search(rf"\b(?:{pattern})\b", text):
+            return _SMALL_TALK_REPLIES[kind]
+    return None
+
+
 @dataclass
 class RetrievedChunk:
     text: str
@@ -55,6 +87,7 @@ class RagResult:
     answer: str
     sources: list[RetrievedChunk] = field(default_factory=list)
     refused: bool = False
+    small_talk: bool = False
 
 
 def retrieve(query: str, top_k: int = LLM_TOP_K) -> list[RetrievedChunk]:
@@ -74,16 +107,42 @@ def retrieve(query: str, top_k: int = LLM_TOP_K) -> list[RetrievedChunk]:
     return hits
 
 
-def answer(query: str, top_k: int = LLM_TOP_K) -> RagResult:
-    """Full RAG turn: retrieve, refuse if nothing is relevant, else answer with citations."""
+# The model was told to reply with REFUSAL_TEXT when the sources don't cover
+# the question. Smaller models sometimes refuse and then answer from memory
+# anyway; we detect the refusal by its opening and drop anything after it so
+# ungrounded text never shows.
+_REFUSAL_PREFIX = REFUSAL_TEXT[:40]
+
+
+def _prepare(query: str, top_k: int) -> tuple[RagResult | None, list[RetrievedChunk]]:
+    """Handle the turns that never reach the LLM. Returns (final_result, hits)."""
+    reply = small_talk_reply(query)
+    if reply is not None:
+        return RagResult(answer=reply, small_talk=True), []
+
     hits = retrieve(query, top_k=top_k)
 
     # Refusal: nothing retrieved is close enough to ground an answer.
     if not hits or hits[0].distance > RETRIEVAL_MAX_DISTANCE:
-        return RagResult(answer=REFUSAL_TEXT, sources=hits, refused=True)
+        return RagResult(answer=REFUSAL_TEXT, sources=hits, refused=True), hits
+    return None, hits
 
+
+_DELIMITER_RE = re.compile(r"<\s*/?\s*untrusted", re.IGNORECASE)
+
+
+def _neutralize(text: str) -> str:
+    """Stop document text from forging our delimiters.
+
+    Without this, a poisoned document containing "</untrusted>" could close the
+    wrapper early and have the text after it read as trusted instructions.
+    """
+    return _DELIMITER_RE.sub("[tag removed]", text).replace('"', "'")
+
+
+def _messages(query: str, hits: list[RetrievedChunk]) -> list[dict]:
     context_blocks = "\n\n".join(
-        f"<untrusted source=\"{i}. {h.citation}\">\n{h.text}\n</untrusted>"
+        f"<untrusted source=\"{i}. {_neutralize(h.citation)}\">\n{_neutralize(h.text)}\n</untrusted>"
         for i, h in enumerate(hits, start=1)
     )
     user_prompt = (
@@ -92,14 +151,76 @@ def answer(query: str, top_k: int = LLM_TOP_K) -> RagResult:
         f"{context_blocks}\n\n"
         f"Answer using only these sources, citing [n] markers."
     )
+    return [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ]
 
-    client = get_llm_client()
-    response = client.chat.completions.create(
+
+def answer(query: str, top_k: int = LLM_TOP_K) -> RagResult:
+    """Full RAG turn: retrieve, refuse if nothing is relevant, else answer with citations."""
+    early, hits = _prepare(query, top_k)
+    if early is not None:
+        return early
+
+    response = get_llm_client().chat.completions.create(
         model=OLLAMA_MODEL,
         temperature=LLM_TEMPERATURE,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
+        messages=_messages(query, hits),
     )
-    return RagResult(answer=response.choices[0].message.content.strip(), sources=hits)
+    text = (response.choices[0].message.content or "").strip()
+    if text.startswith(_REFUSAL_PREFIX):
+        return RagResult(answer=REFUSAL_TEXT, sources=hits, refused=True)
+    return RagResult(answer=text, sources=hits)
+
+
+def stream_answer(query: str, top_k: int = LLM_TOP_K) -> tuple[RagResult, Iterator[str] | None]:
+    """Like answer(), but streams the LLM's text as it's generated.
+
+    Returns (result, pieces). If pieces is None the result is already final
+    (small talk or retrieval refusal). Otherwise iterate pieces to display text;
+    `result` is filled in as you go and is final once the iterator is exhausted
+    (result.refused flips to True if the model refused).
+    """
+    early, hits = _prepare(query, top_k)
+    if early is not None:
+        return early, None
+
+    result = RagResult(answer="", sources=hits)
+
+    def pieces() -> Iterator[str]:
+        stream = get_llm_client().chat.completions.create(
+            model=OLLAMA_MODEL,
+            temperature=LLM_TEMPERATURE,
+            messages=_messages(query, hits),
+            stream=True,
+        )
+        # Hold text back only while it could still be the start of a refusal.
+        # Real answers diverge from the refusal within a word or two.
+        held, released = "", False
+        try:
+            for chunk in stream:
+                piece = (chunk.choices[0].delta.content or "") if chunk.choices else ""
+                if not piece:
+                    continue
+                if released:
+                    result.answer += piece
+                    yield piece
+                    continue
+                held += piece
+                start = held.lstrip()
+                if start.startswith(_REFUSAL_PREFIX):
+                    result.answer, result.refused = REFUSAL_TEXT, True
+                    return
+                if not _REFUSAL_PREFIX.startswith(start):
+                    released = True
+                    result.answer = start
+                    yield start
+            if not released and held.strip():  # short reply that never diverged
+                result.answer = held.strip()
+                yield result.answer
+        finally:
+            stream.close()
+        result.answer = result.answer.strip()
+
+    return result, pieces()
