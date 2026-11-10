@@ -101,10 +101,46 @@ To use your own documents, drop `.md`, `.txt` or `.pdf` files into `data/` and c
 - **Avoid reload pauses:** set `OLLAMA_KEEP_ALIVE=30m` so the model stays loaded between questions.
 - **Apply them:** restart Ollama after setting either one.
 
+## Docker (one command, still fully local)
+
+```bash
+docker compose up --build
+docker compose exec ollama ollama pull llama3.1:8b   # first run only
+# open http://localhost:8501
+```
+
+The app runs in one container, Ollama in another; your corpus (`./data`), the
+vector index, and the query log (`./cache`) are volume-mounted, so rebuilds
+keep everything. No API keys, nothing leaves the machine except the model pull.
+
+## Observability
+
+Every turn appends one JSONL record to `cache/query_log.jsonl` (gitignored —
+stays on your machine): the query, retrieved sources with cosine distances,
+refusal/small-talk flags, and latency split into retrieval vs. total. Logged
+best-effort — a broken log file can never break a chat turn.
+
+```python
+from observability import stats, summarize_line
+summarize_line()   # e.g. "12 turns · refusal rate 8% · retrieval median 14.2ms · total median 2.4s"
+stats()            # totals, refusal rate, median latencies, hit distribution by source
+```
+
+These are the three numbers worth quoting in an interview: refusal rate
+(how often the system admits it doesn't know), retrieval latency, and which
+sources actually get retrieved.
+
+## Demo
+
+![Retrieval trace demo](docs/demo.gif)
+
+Regenerate it (runs real retrieval against your index, no LLM needed):
+`python scripts/make_demo_gif.py --still`
+
 ## Tests and evals
 
 ```bash
-pytest -q                                  # 47 unit tests: chunking, cache, refusal, streaming, escaping, injection guards
+pytest -q                                  # 56 unit tests: chunking, cache, refusal, streaming, escaping, injection guards, observability
 python evals/run_eval.py                   # retrieval hit-rate, fails below 80% (CI gate)
 python evals/injection_eval.py             # live red-team (needs Ollama)
 python evals/injection_eval.py --control   # same attacks against a naive undefended prompt
@@ -120,12 +156,13 @@ To regenerate the screenshots: `pip install playwright`, then `python scripts/ta
 app.py                  # Streamlit entry point: wires UI + RAG together
 rag.py                  # small talk -> retrieve -> refusal gate -> streamed, cited answer
 config.py               # settings from .env + lazy client singletons
+observability.py        # per-turn JSONL query log + stats (refusal rate, latency)
 warmup.py               # loads the embedding model + LLM in the background at launch
 ingest/                 # loader (txt/md/pdf) -> chunker -> embedder (+ SQLite cache) -> ChromaDB
 ui/                     # render.py (escape-first HTML), sidebar.py, knowledge_base.py, styles.css
 evals/                  # retrieval eval + prompt-injection red-team, with reports
 tests/                  # unit tests
-scripts/                # screenshot generator
+scripts/                # demo-GIF generator (real retrieval), screenshot generator
 data/sample-corpus/     # AI-security sample documents
 ```
 
@@ -135,7 +172,7 @@ data/sample-corpus/     # AI-security sample documents
 - **Red-team can't separate prompt defenses from model training.** Next step: stronger attacks, poisoned passages ranked first, and smaller or less safety-tuned models as targets.
 - [ ] Conversation memory (rewrite follow-ups into standalone questions)
 - [ ] Hybrid search (BM25 + vectors) and re-ranking
-- [ ] Docker setup
+- [x] Docker setup (`docker compose up --build`) — deployment stays local on purpose: the privacy story ("documents never leave your machine") *is* the differentiator
 
 ## License
 

@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 
 from config import LLM_TEMPERATURE, LLM_TOP_K, OLLAMA_MODEL, RETRIEVAL_MAX_DISTANCE, get_collection, get_llm_client
 from ingest.embedder import embed_query
+from observability import Timer, log_turn
 
 REFUSAL_TEXT = (
     "I don't have relevant material in my knowledge base to answer that "
@@ -157,21 +158,43 @@ def _messages(query: str, hits: list[RetrievedChunk]) -> list[dict]:
     ]
 
 
+def _log(query: str, result: RagResult, retrieval_ms: float, total_ms: float | None, streamed: bool) -> None:
+    """Best-effort turn logging — observability must never break a chat turn."""
+    try:
+        log_turn(
+            query,
+            sources=[(h.source, h.distance) for h in result.sources],
+            refused=result.refused,
+            small_talk=result.small_talk,
+            retrieval_ms=retrieval_ms,
+            total_ms=total_ms,
+            streamed=streamed,
+        )
+    except Exception:  # pragma: no cover - defensive; logging is best-effort
+        pass
+
+
 def answer(query: str, top_k: int = LLM_TOP_K) -> RagResult:
     """Full RAG turn: retrieve, refuse if nothing is relevant, else answer with citations."""
-    early, hits = _prepare(query, top_k)
-    if early is not None:
-        return early
+    with Timer() as total, Timer() as prep:
+        early, hits = _prepare(query, top_k)
+        if early is not None:
+            _log(query, early, prep.ms, total.ms, streamed=False)
+            return early
 
-    response = get_llm_client().chat.completions.create(
-        model=OLLAMA_MODEL,
-        temperature=LLM_TEMPERATURE,
-        messages=_messages(query, hits),
-    )
-    text = (response.choices[0].message.content or "").strip()
-    if text.startswith(_REFUSAL_PREFIX):
-        return RagResult(answer=REFUSAL_TEXT, sources=hits, refused=True)
-    return RagResult(answer=text, sources=hits)
+        response = get_llm_client().chat.completions.create(
+            model=OLLAMA_MODEL,
+            temperature=LLM_TEMPERATURE,
+            messages=_messages(query, hits),
+        )
+        text = (response.choices[0].message.content or "").strip()
+        if text.startswith(_REFUSAL_PREFIX):
+            result = RagResult(answer=REFUSAL_TEXT, sources=hits, refused=True)
+            _log(query, result, prep.ms, total.ms, streamed=False)
+            return result
+    result = RagResult(answer=text, sources=hits)
+    _log(query, result, prep.ms, total.ms, streamed=False)
+    return result
 
 
 def stream_answer(query: str, top_k: int = LLM_TOP_K) -> tuple[RagResult, Iterator[str] | None]:
@@ -182,8 +205,10 @@ def stream_answer(query: str, top_k: int = LLM_TOP_K) -> tuple[RagResult, Iterat
     `result` is filled in as you go and is final once the iterator is exhausted
     (result.refused flips to True if the model refused).
     """
-    early, hits = _prepare(query, top_k)
+    with Timer() as prep:
+        early, hits = _prepare(query, top_k)
     if early is not None:
+        _log(query, early, prep.ms, prep.ms, streamed=False)
         return early, None
 
     result = RagResult(answer="", sources=hits)
@@ -221,6 +246,7 @@ def stream_answer(query: str, top_k: int = LLM_TOP_K) -> tuple[RagResult, Iterat
                 yield result.answer
         finally:
             stream.close()
+            _log(query, result, prep.ms, None, streamed=True)
         result.answer = result.answer.strip()
 
     return result, pieces()
