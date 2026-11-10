@@ -1,0 +1,37 @@
+# RAG Research Copilot — fully local, one command.
+#
+#   docker compose up --build
+#   docker compose exec ollama ollama pull llama3.1:8b   # first run only
+#   open http://localhost:8501
+#
+# Everything stays on this machine: docs (./data), index + query log (./cache),
+# and the LLM (ollama volume). No API keys, no outbound calls except the model
+# pull itself.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+    # Uncomment to expose the Ollama API to the host (not needed for the app):
+    # ports:
+    #   - "11434:11434"
+
+  app:
+    build: .
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434/v1
+      OLLAMA_MODEL: llama3.1:8b
+      # Point at the sibling service's container name.
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data          # your corpus (gitignored except sample-corpus)
+      - ./cache:/app/cache        # vector index + query log persist across rebuilds
+    restart: unless-stopped
+
+volumes:
+  ollama:
