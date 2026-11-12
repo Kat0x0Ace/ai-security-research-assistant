@@ -65,6 +65,7 @@ flowchart LR
 | Layer | Choice | Runs |
 |---|---|---|
 | Embeddings | sentence-transformers `all-MiniLM-L6-v2` (384-dim) | local CPU |
+| Retrieval | hybrid: vectors + BM25 fused via RRF | local CPU |
 | Vector DB | ChromaDB, persistent | local disk |
 | LLM | Ollama `llama3.1:8b` (swappable via `.env`) | local GPU/CPU |
 | UI | Streamlit, custom theme, self-hosted fonts | local |
@@ -171,7 +172,7 @@ data/sample-corpus/     # AI-security sample documents
 - **No conversation memory:** each question is answered on its own, so follow-ups like "tell me more" don't work yet.
 - **Red-team can't separate prompt defenses from model training.** Next step: stronger attacks, poisoned passages ranked first, and smaller or less safety-tuned models as targets.
 - [ ] Conversation memory (rewrite follow-ups into standalone questions)
-- [ ] Hybrid search (BM25 + vectors) and re-ranking
+- [x] Hybrid search (BM25 + vectors, fused with Reciprocal Rank Fusion) — retrieval hit-rate went from 96% to **100%** on the eval set; the one case pure-vector retrieval missed is now caught by keyword matching. Set `HYBRID_SEARCH=0` to compare.
 - [x] Docker setup (`docker compose up --build`) — deployment stays local on purpose: the privacy story ("documents never leave your machine") *is* the differentiator
 
 ## License

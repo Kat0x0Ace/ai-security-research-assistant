@@ -4,6 +4,9 @@ sentence-transformers>=3.0,<6
 # --- Vector DB (local) ---
 chromadb>=0.5,<2
 
+# --- Hybrid retrieval (BM25 over the same local chunks) ---
+rank-bm25>=0.2,<1
+
 # --- LLM (Ollama via OpenAI-compatible client) ---
 openai>=1.50,<2
 
