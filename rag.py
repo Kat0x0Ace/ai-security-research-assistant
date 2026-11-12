@@ -73,6 +73,53 @@ def small_talk_reply(query: str) -> str | None:
     return None
 
 
+_REWRITE_SYSTEM = (
+    "You rewrite a follow-up question as a standalone question that can be "
+    "answered without seeing the conversation. Use the recent conversation only "
+    "to resolve pronouns and ellipsis. Reply with ONLY the rewritten question — "
+    "no commentary. If the question is already standalone, reply with it unchanged."
+)
+
+# Follow-up markers: if none of these appear, the question is treated as
+# standalone and skips the rewrite LLM call entirely (cheaper + safer).
+# Pronouns match anywhere in the question ("does it also attack PDFs?").
+_FOLLOWUP_RE = re.compile(
+    r"^(?:it|that|this|they|them|those|these|he|she|and|so|also|more|again|another)\b"
+    r"|^(?:tell me more|go on|continue|elaborate|expand|what about|how so|why)\b"
+    r"|\b(?:it|they|them|these|those)\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_followup(query: str) -> bool:
+    return bool(_FOLLOWUP_RE.search(query.strip()))
+
+
+def rewrite_followup(query: str, history: list[tuple[str, str]] | None) -> str:
+    """Resolve pronouns/ellipsis against recent turns so retrieval can find context.
+
+    Returns a standalone question. Falls back to a lexical heuristic when the
+    LLM is unreachable — memory must degrade, never break.
+    """
+    if not history or not _looks_like_followup(query):
+        return query
+    try:
+        convo = "\n".join(f"User: {q}\nAssistant: {a[:400]}" for q, a in history[-4:])
+        response = get_llm_client().chat.completions.create(
+            model=OLLAMA_MODEL,
+            temperature=0,
+            messages=[
+                {"role": "system", "content": _REWRITE_SYSTEM},
+                {"role": "user", "content": f"Recent conversation:\n{convo}\n\nFollow-up: {query}"},
+            ],
+        )
+        rewritten = (response.choices[0].message.content or "").strip().strip('"')
+        return rewritten or query
+    except Exception:
+        last_q, _ = history[-1]
+        return f"{query} (regarding: {last_q})"
+
+
 @dataclass
 class RetrievedChunk:
     text: str
@@ -185,41 +232,54 @@ def _log(query: str, result: RagResult, retrieval_ms: float, total_ms: float | N
         pass
 
 
-def answer(query: str, top_k: int = LLM_TOP_K) -> RagResult:
-    """Full RAG turn: retrieve, refuse if nothing is relevant, else answer with citations."""
+def answer(query: str, top_k: int = LLM_TOP_K, history: list[tuple[str, str]] | None = None) -> RagResult:
+    """Full RAG turn: retrieve, refuse if nothing is relevant, else answer with citations.
+
+    `history` is the recent (question, answer) pairs; follow-ups get rewritten
+    into standalone questions before retrieval (see rewrite_followup).
+    """
+    rewritten = rewrite_followup(query, history)
     with Timer() as total, Timer() as prep:
-        early, hits = _prepare(query, top_k)
+        early, hits = _prepare(rewritten, top_k)
         if early is not None:
-            _log(query, early, prep.ms, total.ms, streamed=False)
+            _log(query if rewritten == query else f"{query} → {rewritten}", early, prep.ms, total.ms, streamed=False)
             return early
 
         response = get_llm_client().chat.completions.create(
             model=OLLAMA_MODEL,
             temperature=LLM_TEMPERATURE,
-            messages=_messages(query, hits),
+            messages=_messages(rewritten, hits),
         )
         text = (response.choices[0].message.content or "").strip()
         if text.startswith(_REFUSAL_PREFIX):
             result = RagResult(answer=REFUSAL_TEXT, sources=hits, refused=True)
-            _log(query, result, prep.ms, total.ms, streamed=False)
+            _log(query if rewritten == query else f"{query} → {rewritten}", result, prep.ms, total.ms, streamed=False)
             return result
     result = RagResult(answer=text, sources=hits)
-    _log(query, result, prep.ms, total.ms, streamed=False)
+    _log(query if rewritten == query else f"{query} → {rewritten}", result, prep.ms, total.ms, streamed=False)
     return result
 
 
-def stream_answer(query: str, top_k: int = LLM_TOP_K) -> tuple[RagResult, Iterator[str] | None]:
+def stream_answer(
+    query: str,
+    top_k: int = LLM_TOP_K,
+    history: list[tuple[str, str]] | None = None,
+) -> tuple[RagResult, Iterator[str] | None]:
     """Like answer(), but streams the LLM's text as it's generated.
+
+    `history` enables conversation memory: follow-ups are rewritten into
+    standalone questions before retrieval.
 
     Returns (result, pieces). If pieces is None the result is already final
     (small talk or retrieval refusal). Otherwise iterate pieces to display text;
     `result` is filled in as you go and is final once the iterator is exhausted
     (result.refused flips to True if the model refused).
     """
+    rewritten = rewrite_followup(query, history)
     with Timer() as prep:
-        early, hits = _prepare(query, top_k)
+        early, hits = _prepare(rewritten, top_k)
     if early is not None:
-        _log(query, early, prep.ms, prep.ms, streamed=False)
+        _log(query if rewritten == query else f"{query} → {rewritten}", early, prep.ms, prep.ms, streamed=False)
         return early, None
 
     result = RagResult(answer="", sources=hits)
@@ -228,7 +288,7 @@ def stream_answer(query: str, top_k: int = LLM_TOP_K) -> tuple[RagResult, Iterat
         stream = get_llm_client().chat.completions.create(
             model=OLLAMA_MODEL,
             temperature=LLM_TEMPERATURE,
-            messages=_messages(query, hits),
+            messages=_messages(rewritten, hits),
             stream=True,
         )
         # Hold text back only while it could still be the start of a refusal.
@@ -257,7 +317,7 @@ def stream_answer(query: str, top_k: int = LLM_TOP_K) -> tuple[RagResult, Iterat
                 yield result.answer
         finally:
             stream.close()
-            _log(query, result, prep.ms, None, streamed=True)
+            _log(query if rewritten == query else f"{query} → {rewritten}", result, prep.ms, None, streamed=True)
         result.answer = result.answer.strip()
 
     return result, pieces()

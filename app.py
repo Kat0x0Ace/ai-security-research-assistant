@@ -54,13 +54,31 @@ def to_message(result: RagResult) -> dict:
     return {"role": "assistant", "kind": kind, "content": result.answer, "sources": sources}
 
 
-def stream_reply(question: str) -> dict:
+def _recent_history(messages: list[dict], max_turns: int = 4) -> list[tuple[str, str]]:
+    """Last answered (question, answer) pairs for follow-up rewriting.
+
+    Only grounded answers count — refusals and errors carry no topic context.
+    """
+    pairs: list[tuple[str, str]] = []
+    pending_q: str | None = None
+    for m in messages:
+        if m["role"] == "user":
+            pending_q = m["content"]
+        elif pending_q is not None and m.get("kind") == "answer":
+            pairs.append((pending_q, m["content"]))
+            pending_q = None
+        elif m["role"] == "assistant":
+            pending_q = None
+    return pairs[-max_turns:]
+
+
+def stream_reply(question: str, history: list[tuple[str, str]] | None = None) -> dict:
     """Show the assistant's reply as it's generated; return it for the history."""
     with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
         body = st.empty()
         try:
             with st.spinner("Searching the knowledge base…"):
-                result, pieces = stream_answer(question)
+                result, pieces = stream_answer(question, history=history)
             if pieces is not None:
                 body.markdown(thinking_html(len(result.sources)), unsafe_allow_html=True)
                 text = ""
@@ -129,7 +147,8 @@ for message in st.session_state.messages:
     render(message)
 
 if prompt:
+    history = _recent_history(st.session_state.messages)
     user_message = {"role": "user", "content": prompt}
     st.session_state.messages.append(user_message)
     render(user_message)
-    st.session_state.messages.append(stream_reply(prompt))
+    st.session_state.messages.append(stream_reply(prompt, history=history))
