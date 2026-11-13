@@ -19,10 +19,6 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      # The default Linux torch wheel bundles multi-GB CUDA libraries; CI only needs CPU.
-      - name: Install CPU-only PyTorch
-        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
-
       - name: Install dependencies
         run: pip install -r requirements.txt
 

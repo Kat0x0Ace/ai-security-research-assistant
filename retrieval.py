@@ -122,10 +122,14 @@ def retrieve_hybrid(query: str, top_k: int = LLM_TOP_K) -> list[dict]:
     # Distances: reuse the vector search's where possible; fetch stored
     # embeddings for BM25-only chunks so the refusal gate sees true distances.
     need_vectors = [cid for cid in fused_ids if cid not in vec_meta]
-    stored: dict[str, list[float]] = {}
+    stored: dict[str, tuple[str, dict, list[float]]] = {}
     if need_vectors:
-        got = collection.get(ids=need_vectors, include=["embeddings"])
-        stored = {cid: list(emb) for cid, emb in zip(got["ids"], got["embeddings"])}
+        # collection.get returns a dict of parallel lists — read fields by key.
+        got = collection.get(ids=need_vectors, include=["documents", "metadatas", "embeddings"])
+        stored = {
+            cid: (doc, meta, list(emb))
+            for cid, doc, meta, emb in zip(got["ids"], got["documents"], got["metadatas"], got["embeddings"])
+        }
 
     qv = np.asarray(vector, dtype=float)
     out = []
@@ -133,9 +137,8 @@ def retrieve_hybrid(query: str, top_k: int = LLM_TOP_K) -> list[dict]:
         if cid in vec_meta:
             doc, meta, dist = vec_meta[cid]
         elif cid in stored:
-            doc, meta = collection.get(ids=[cid], include=["documents", "metadatas"])
-            doc, meta = doc[0], meta[0]
-            sv = np.asarray(stored[cid], dtype=float)
+            doc, meta, emb = stored[cid]
+            sv = np.asarray(emb, dtype=float)
             denom = float(np.linalg.norm(qv) * np.linalg.norm(sv))
             dist = float(1.0 - (float(np.dot(qv, sv)) / denom if denom else 0.0))
         else:

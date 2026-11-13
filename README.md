@@ -64,7 +64,7 @@ flowchart LR
 
 | Layer | Choice | Runs |
 |---|---|---|
-| Embeddings | sentence-transformers `all-MiniLM-L6-v2` (384-dim) | local CPU |
+| Embeddings | `all-MiniLM-L6-v2` (384-dim) on ONNX Runtime, no PyTorch | local CPU |
 | Retrieval | hybrid: vectors + BM25 fused via RRF | local CPU |
 | Vector DB | ChromaDB, persistent | local disk |
 | LLM | Ollama `llama3.1:8b` (swappable via `.env`) | local GPU/CPU |

@@ -1,5 +1,8 @@
 # --- Embeddings (local) ---
-sentence-transformers>=3.0,<6
+# all-MiniLM-L6-v2 runs on ONNX Runtime via ChromaDB's bundled export (see config.py).
+# No PyTorch / sentence-transformers needed.
+onnxruntime>=1.17,<2
+numpy>=1.26
 
 # --- Vector DB (local) ---
 chromadb>=0.5,<2
