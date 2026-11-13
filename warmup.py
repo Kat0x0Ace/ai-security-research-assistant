@@ -33,7 +33,7 @@ def start_warmup() -> None:
 
 def _warm() -> None:
     try:
-        get_embedding_model().encode("warm up")
+        get_embedding_model()(["warm up"])
     except Exception:
         log.exception("Embedding model warm-up failed")
     try:

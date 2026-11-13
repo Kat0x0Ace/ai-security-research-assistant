@@ -61,8 +61,16 @@ _embedding_model = None
 _embedding_lock = threading.Lock()
 
 
+_SUPPORTED_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+
 def get_embedding_model():
-    """Lazy singleton for the local sentence-transformers model.
+    """Lazy singleton for the local all-MiniLM-L6-v2 model, run with ONNX Runtime.
+
+    Uses ChromaDB's bundled ONNX export instead of sentence-transformers/PyTorch:
+    same model, vectors measured identical (cosine 1.000000 on every cached chunk),
+    without the multi-GB PyTorch install, whose unsigned DLLs Windows
+    application-control policies can block. Callable: model(["text", ...]) -> list of vectors.
 
     Locked because the app warms it up on a background thread (see warmup.py);
     a question arriving mid-warm-up waits for that load instead of starting a second one.
@@ -71,9 +79,14 @@ def get_embedding_model():
     if _embedding_model is None:
         with _embedding_lock:
             if _embedding_model is None:
-                from sentence_transformers import SentenceTransformer
+                if EMBEDDING_MODEL != _SUPPORTED_EMBEDDING_MODEL:
+                    raise ValueError(
+                        f"EMBEDDING_MODEL={EMBEDDING_MODEL!r} is not supported: the ONNX "
+                        f"embedder only runs {_SUPPORTED_EMBEDDING_MODEL!r}."
+                    )
+                from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
 
-                _embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+                _embedding_model = ONNXMiniLM_L6_V2()
     return _embedding_model
 
 

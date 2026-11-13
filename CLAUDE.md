@@ -10,7 +10,7 @@ Core loop: ask a question → get a cited answer in a few seconds → open the s
 
 ## Stack
 
-- **Embeddings**: sentence-transformers `all-MiniLM-L6-v2` (384-dim), local CPU
+- **Embeddings**: `all-MiniLM-L6-v2` (384-dim) via ONNX Runtime (ChromaDB's bundled export), local CPU. No PyTorch (Windows application-control policies can block its DLLs)
 - **Vector DB**: ChromaDB persistent client (`cache/chroma`), cosine
 - **LLM**: Ollama `llama3.1:8b` through its OpenAI-compatible endpoint (swappable via `.env`)
 - **UI**: Streamlit 1.66, custom "analyst's dossier" theme, fonts self-hosted in `static/fonts`
