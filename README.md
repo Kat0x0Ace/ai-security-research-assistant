@@ -31,7 +31,7 @@ Every tuning decision below came from a measurement on this project, not a defau
 | **ONNX Runtime** instead of PyTorch | Cosine similarity of new vs. old vectors on every chunk | 1.000000 (identical), with a far smaller install. PyTorch's DLLs can be blocked by Windows application-control policies |
 | Refusal gate on the **closest** passage | Real vs. off-topic questions under hybrid retrieval | 0/25 real questions refused, 0/8 off-topic let through. Robust when keyword search ranks a weaker passage first |
 
-Current numbers: **100% retrieval hit-rate** (25/25, with hybrid search), **82 unit tests**, answers start appearing within a few seconds on integrated graphics (no discrete GPU needed).
+Current numbers: **100% retrieval hit-rate** (25/25, with hybrid search), **87 unit tests**, answers start appearing within a few seconds on integrated graphics (no discrete GPU needed).
 
 ## Security model
 
@@ -57,6 +57,17 @@ Full results: [`evals/injection_matrix.md`](evals/injection_matrix.md). Renderin
 - **They don't stop "subtle poisoning":** a planted false fact written like normal content. No prompt can tell a lie from a fact. What helps is that the false claim is **cited**, for example "…also known as a PWNED-7731 attack [1]", so a reader can trace it to the poisoned source. Citations are the mitigation for this class of attack, not the prompt.
 - **A weaker model is much easier to fool, with or without defenses.** That's why the default stays on the 8B model.
 - **Rates vary run to run** (sampling temperature 0.2). Treat the numbers as rough proportions, not exact rates.
+
+**Self-audit before publishing.** A full security review of this repo found these issues, all fixed:
+
+| Found | Risk | Fix |
+|---|---|---|
+| The app listened on every network interface | Anyone on the same Wi-Fi could open the app and query your private documents | Binds to `127.0.0.1`; Docker publishes to `127.0.0.1` only. Verified: the LAN address is refused |
+| Follow-up rewriting read earlier *answers* | Answers can quote a poisoned document, and the rewritten question lands in the prompt's trusted "Question" slot | The rewrite sees only the user's own questions; its output must be one line, ≤200 chars, no URLs. Unit-tested |
+| No `.dockerignore` | Building the image baked private docs, the query log and `.env` into its layers | `.dockerignore` keeps them out; the container runs as a non-root user |
+| Uncaught errors showed stack traces | Local file paths (including the OS username) visible in the browser | Error details hidden in the UI; still printed in the terminal |
+
+Known and not applicable: `pip-audit` flags CVEs in ChromaDB 1.5.9, all in ChromaDB's standalone HTTP server. This app uses ChromaDB embedded in-process and never runs that server.
 
 ## How it works
 
@@ -160,7 +171,7 @@ Regenerate it (runs real retrieval against your index, no LLM needed):
 ## Tests and evals
 
 ```bash
-pytest -q                                  # 82 unit tests: chunking, cache, refusal, streaming, escaping, injection guards,
+pytest -q                                  # 87 unit tests: chunking, cache, refusal, streaming, escaping, injection guards,
                                            #   hybrid retrieval (incl. a real in-memory ChromaDB), memory, observability
 python evals/run_eval.py                   # retrieval hit-rate, fails below 80% (CI gate)
 python evals/injection_eval.py             # live red-team (needs Ollama)
@@ -192,7 +203,6 @@ data/sample-corpus/     # AI-security sample documents
 ## Known limitations and roadmap
 
 - **Subtle poisoning gets through the prompt layer.** A false fact written like normal content can be repeated, but it is cited to its source, so it's traceable (see Security model).
-- **Follow-up rewriting sees earlier answers.** Those answers can contain document text, so a poisoned document could in principle steer the rewritten search query. Its effect is limited to which passages get retrieved.
 - [ ] Per-claim citation check: verify each cited sentence is supported by its passage (a direct counter to subtle poisoning)
 - [ ] Cross-encoder re-ranking on top of hybrid retrieval
 - [x] Conversation memory — follow-ups ("tell me more", "does it also attack PDFs?") are rewritten into standalone questions against the last 4 answered turns before retrieval. Heuristic pre-filter skips the rewrite call for standalone questions; if the LLM is unreachable, memory degrades to a lexical fallback instead of breaking. Refusals/errors don't pollute context.

@@ -24,7 +24,7 @@ Core loop: ask a question → get a cited answer in a few seconds → open the s
 - **LLM**: Ollama `llama3.1:8b` through its OpenAI-compatible endpoint (swappable via `.env`).
 - **UI**: Streamlit 1.66, custom "analyst's dossier" theme, fonts self-hosted in `static/fonts`.
 - **Packaging**: Docker (`Dockerfile` + `docker-compose.yml`, Ollama runs as a sibling container).
-- **Tests**: pytest (80 tests), retrieval eval, live prompt-injection red-team; GitHub Actions CI.
+- **Tests**: pytest (87 tests), retrieval eval, live prompt-injection red-team; GitHub Actions CI.
 - **Lang**: Python 3.11+ (developed on 3.14, CI and Docker on 3.12).
 
 ## Architecture in one paragraph
@@ -62,10 +62,12 @@ data/sample-corpus/     # AI-security sample documents
 - ✅ Conversation memory (follow-up rewriting)
 - ✅ Observability (query log), Docker packaging, demo GIF
 - ✅ ONNX embeddings (no PyTorch); hybrid-retrieval crash fixed
-- ⏳ Refusal gate on the closest passage instead of the top fused result
-- ⏳ Stronger red-team (poisoned passage ranked first; less safety-tuned target model)
-- ⏳ README accuracy pass + refreshed screenshots
-- ⏳ `/security-audit`, full-history leak check, publish
+- ✅ Refusal gate on the closest passage instead of the top fused result
+- ✅ Stronger red-team matrix (poison ranked first, weaker model, controls): defenses cut attack success 2–5×
+- ✅ README accuracy pass + refreshed screenshots and demo GIF
+- ✅ `/security-audit`: 4 findings fixed (network binding, follow-up rewrite, Docker image contents, error details)
+- ⏳ Full-history leak check, publish
+- Parked (optional): pin CI actions to commit hashes
 
 ## How to run
 
@@ -112,6 +114,10 @@ streamlit run app.py
 - All model output, excerpts and titles are HTML-escaped before display. Markdown links and images never render (exfiltration guard).
 - Off-topic questions never reach the LLM. Refuse-then-answer output is truncated, including while streaming.
 - The query log stores question text **locally** (`cache/`, gitignored). It never leaves the machine.
+- Streamlit binds `127.0.0.1` only (`.streamlit/config.toml`); Docker publishes `127.0.0.1:8501`. Error details are hidden in the UI.
+- Follow-up rewriting sees only the user's earlier **questions**, never answers (answers can quote poisoned documents); rewrite output is validated (one line, ≤200 chars, no URLs).
+- `.dockerignore` keeps `data/` (except the sample corpus), `cache/`, `.env` and `.venv` out of the image; the container runs as non-root.
+- ChromaDB 1.5.9 CVEs affect only its standalone HTTP server, which this app never runs. Upgrade when a fix ships.
 - The live red-team was **inconclusive**: the undefended control resisted too. Don't claim the prompt layer "stops" attacks; the unit tests are the proof.
 - **This file is tracked in git and the repo is going public:** no personal info, usernames, paths or device details in it or in the session log.
 

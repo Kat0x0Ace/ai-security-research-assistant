@@ -3,6 +3,15 @@
 
 [server]
 enableStaticServing = true
+# Listen on this computer only. Without this, Streamlit accepts connections on
+# every network interface, so anyone on the same Wi-Fi could query your documents.
+# (Docker overrides this on the command line; compose then publishes to 127.0.0.1 only.)
+address = "127.0.0.1"
+
+[client]
+# Uncaught errors show a short message, not a stack trace with local file paths.
+# Full details still print in the terminal.
+showErrorDetails = "none"
 
 [browser]
 gatherUsageStats = false

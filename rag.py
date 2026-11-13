@@ -95,29 +95,48 @@ def _looks_like_followup(query: str) -> bool:
     return bool(_FOLLOWUP_RE.search(query.strip()))
 
 
+_REWRITE_MAX_CHARS = 200
+_URLISH_RE = re.compile(r"https?://|www\.|\b[\w-]+\.(?:com|net|org|io|example)\b", re.IGNORECASE)
+
+
+def _lexical_followup(query: str, history: list[tuple[str, str]]) -> str:
+    last_q, _ = history[-1]
+    return f"{query} (regarding: {last_q})"
+
+
 def rewrite_followup(query: str, history: list[tuple[str, str]] | None) -> str:
     """Resolve pronouns/ellipsis against recent turns so retrieval can find context.
 
     Returns a standalone question. Falls back to a lexical heuristic when the
     LLM is unreachable — memory must degrade, never break.
+
+    SECURITY: the rewrite only sees the user's own earlier QUESTIONS, never the
+    assistant's answers. Answers can quote retrieved (attacker-writable) document
+    text, and the rewritten question lands in the trusted "Question:" slot of the
+    answer prompt — so feeding answers here would let a poisoned document write
+    the user's next question. The model's output is also validated (one line,
+    bounded length, no URLs); anything else falls back to the lexical rewrite.
     """
     if not history or not _looks_like_followup(query):
         return query
     try:
-        convo = "\n".join(f"User: {q}\nAssistant: {a[:400]}" for q, a in history[-4:])
+        earlier = "\n".join(f"- {q}" for q, _ in history[-4:])
         response = get_llm_client().chat.completions.create(
             model=OLLAMA_MODEL,
             temperature=0,
             messages=[
                 {"role": "system", "content": _REWRITE_SYSTEM},
-                {"role": "user", "content": f"Recent conversation:\n{convo}\n\nFollow-up: {query}"},
+                {"role": "user", "content": f"Earlier questions from the user:\n{earlier}\n\nFollow-up: {query}"},
             ],
         )
         rewritten = (response.choices[0].message.content or "").strip().strip('"')
-        return rewritten or query
     except Exception:
-        last_q, _ = history[-1]
-        return f"{query} (regarding: {last_q})"
+        return _lexical_followup(query, history)
+    if not rewritten:
+        return query
+    if "\n" in rewritten or len(rewritten) > _REWRITE_MAX_CHARS or _URLISH_RE.search(rewritten):
+        return _lexical_followup(query, history)
+    return rewritten
 
 
 @dataclass

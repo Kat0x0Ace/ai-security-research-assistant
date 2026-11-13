@@ -27,7 +27,8 @@ services:
       OLLAMA_MODEL: llama3.1:8b
       # Point at the sibling service's container name.
     ports:
-      - "8501:8501"
+      # Published on this computer only, not on every network interface.
+      - "127.0.0.1:8501:8501"
     volumes:
       - ./data:/app/data          # your corpus (gitignored except sample-corpus)
       - ./cache:/app/cache        # vector index + query log persist across rebuilds

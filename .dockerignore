@@ -1,0 +1,26 @@
+# Keep private and machine-specific files out of the image. Without this,
+# `COPY . .` would bake your documents, query log and venv into image layers.
+
+# Your own documents: only the sample corpus ships (data/ is mounted at runtime)
+data/*
+!data/sample-corpus/
+
+# Vector index, embedding cache, query log (mounted at runtime)
+cache/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+
+# Dev and repo-only files
+.git/
+.github/
+__pycache__/
+*.pyc
+.pytest_cache/
+docs/
+mockups/
+evals/*.md

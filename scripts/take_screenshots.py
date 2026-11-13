@@ -26,7 +26,7 @@ from playwright.sync_api import Page, sync_playwright
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "screenshots"
 PORT = 8599
-URL = f"http://localhost:{PORT}"
+URL = f"http://127.0.0.1:{PORT}"
 
 
 def start_app() -> subprocess.Popen:
