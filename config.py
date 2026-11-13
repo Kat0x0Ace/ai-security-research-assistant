@@ -49,7 +49,7 @@ DATA_DIR = Path(_get("DATA_DIR", "./data"))
 CACHE_DIR = Path(_get("CACHE_DIR", "./cache"))
 CHUNK_WORDS = int(_get("CHUNK_WORDS", "220"))
 CHUNK_OVERLAP_WORDS = int(_get("CHUNK_OVERLAP_WORDS", "40"))
-LLM_TOP_K = int(_get("LLM_TOP_K", "5"))
+LLM_TOP_K = int(_get("LLM_TOP_K", "3"))
 LLM_TEMPERATURE = float(_get("LLM_TEMPERATURE", "0.2"))
 
 # Ensure directories exist

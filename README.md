@@ -27,8 +27,11 @@ Every tuning decision below came from a measurement on this project, not a defau
 | **3 passages** per question instead of 5 | Timed end to end | 40–97s → 12–20s per answer, same answers and citations |
 | Run on the **integrated GPU** | Ollama logs showed it detected the integrated GPU and then skipped it by default | Generation 9 → 18 tokens/s; answers 8–12s |
 | **Stream** answers + **warm up** models at launch | Time to first words; first question after launch | First words in ~3–5s. First question after launch 14s+ → 5.4s |
+| **Hybrid search** (vectors + BM25) | Retrieval eval, 25 questions | Hit-rate 96% → 100%: the one question pure vectors missed is caught by keyword match |
+| **ONNX Runtime** instead of PyTorch | Cosine similarity of new vs. old vectors on every chunk | 1.000000 (identical), with a far smaller install. PyTorch's DLLs can be blocked by Windows application-control policies |
+| Refusal gate on the **closest** passage | Real vs. off-topic questions under hybrid retrieval | 0/25 real questions refused, 0/8 off-topic let through. Robust when keyword search ranks a weaker passage first |
 
-Current numbers: **96% retrieval hit-rate** (24/25), **47 unit tests**, answers start appearing within a few seconds on integrated graphics (no discrete GPU needed).
+Current numbers: **100% retrieval hit-rate** (25/25, with hybrid search), **82 unit tests**, answers start appearing within a few seconds on integrated graphics (no discrete GPU needed).
 
 ## Security model
 
@@ -61,8 +64,11 @@ Full results: [`evals/injection_matrix.md`](evals/injection_matrix.md). Renderin
 flowchart LR
     Q[Question] --> S{Small talk?}
     S -- yes --> R0[Friendly reply]
-    S -- no --> E[Embed query<br/>MiniLM, local] --> V[(ChromaDB)]
-    V --> T{Closest passage<br/>within 0.75?}
+    S -- no --> F{Follow-up?}
+    F -- yes --> RW[Rewrite as a<br/>standalone question]
+    F -- no --> HY
+    RW --> HY[Hybrid retrieval<br/>MiniLM vectors + BM25, RRF]
+    HY --> T{Closest passage<br/>within 0.75?}
     T -- no --> RF[Refusal]
     T -- yes --> W[Wrap passages as<br/>untrusted data] --> L[Ollama llama3.1:8b<br/>streamed]
     L --> G{Starts with<br/>a refusal?}
@@ -93,6 +99,8 @@ python evals/run_eval.py --reingest   # builds the index from data/ and prints t
 streamlit run app.py
 ```
 
+If Windows blocks `pip.exe` or `streamlit.exe` ("An Application Control policy has blocked this file"), run them through Python instead: `python -m pip install -r requirements.txt` and `python -m streamlit run app.py`.
+
 **Mac / Linux**
 ```bash
 python3 -m venv .venv
@@ -109,6 +117,7 @@ To use your own documents, drop `.md`, `.txt` or `.pdf` files into `data/` and c
 - **Intel/AMD laptop with integrated graphics:** set `OLLAMA_IGPU_ENABLE=1`, otherwise Ollama ignores the iGPU.
 - **Avoid reload pauses:** set `OLLAMA_KEEP_ALIVE=30m` so the model stays loaded between questions.
 - **Apply them:** restart Ollama after setting either one.
+- **Check it worked:** `ollama ps` should show `GPU` in the PROCESSOR column. Ollama 0.40.16 stopped detecting integrated GPUs through Vulkan; 0.40.13 works.
 
 ## Docker (one command, still fully local)
 
@@ -121,6 +130,8 @@ docker compose exec ollama ollama pull llama3.1:8b   # first run only
 The app runs in one container, Ollama in another; your corpus (`./data`), the
 vector index, and the query log (`./cache`) are volume-mounted, so rebuilds
 keep everything. No API keys, nothing leaves the machine except the model pull.
+
+Inside Docker, Ollama can't use an integrated GPU, so answers run at CPU speed. For the fastest setup, run Ollama natively (see Quickstart).
 
 ## Observability
 
@@ -135,7 +146,7 @@ summarize_line()   # e.g. "12 turns · refusal rate 8% · retrieval median 14.2m
 stats()            # totals, refusal rate, median latencies, hit distribution by source
 ```
 
-These are the three numbers worth quoting in an interview: refusal rate
+These are the three numbers that tell you whether it's working: refusal rate
 (how often the system admits it doesn't know), retrieval latency, and which
 sources actually get retrieved.
 
@@ -149,10 +160,12 @@ Regenerate it (runs real retrieval against your index, no LLM needed):
 ## Tests and evals
 
 ```bash
-pytest -q                                  # 56 unit tests: chunking, cache, refusal, streaming, escaping, injection guards, observability
+pytest -q                                  # 82 unit tests: chunking, cache, refusal, streaming, escaping, injection guards,
+                                           #   hybrid retrieval (incl. a real in-memory ChromaDB), memory, observability
 python evals/run_eval.py                   # retrieval hit-rate, fails below 80% (CI gate)
 python evals/injection_eval.py             # live red-team (needs Ollama)
 python evals/injection_eval.py --control   # same attacks against a naive undefended prompt
+python evals/injection_eval.py --matrix    # full grid: models x defended/control x poison rank
 ```
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the unit tests and the retrieval eval on every push. The red-team needs a running LLM, so it runs locally; its latest reports are committed in [`evals/`](evals/).
@@ -163,7 +176,8 @@ To regenerate the screenshots: `pip install playwright`, then `python scripts/ta
 
 ```
 app.py                  # Streamlit entry point: wires UI + RAG together
-rag.py                  # small talk -> retrieve -> refusal gate -> streamed, cited answer
+rag.py                  # small talk -> follow-up rewrite -> retrieve -> refusal gate -> streamed, cited answer
+retrieval.py            # hybrid retrieval: MiniLM vectors + BM25, fused with RRF
 config.py               # settings from .env + lazy client singletons
 observability.py        # per-turn JSONL query log + stats (refusal rate, latency)
 warmup.py               # loads the embedding model + LLM in the background at launch
@@ -177,7 +191,10 @@ data/sample-corpus/     # AI-security sample documents
 
 ## Known limitations and roadmap
 
-- **Red-team can't separate prompt defenses from model training.** Next step: stronger attacks, poisoned passages ranked first, and smaller or less safety-tuned models as targets.
+- **Subtle poisoning gets through the prompt layer.** A false fact written like normal content can be repeated, but it is cited to its source, so it's traceable (see Security model).
+- **Follow-up rewriting sees earlier answers.** Those answers can contain document text, so a poisoned document could in principle steer the rewritten search query. Its effect is limited to which passages get retrieved.
+- [ ] Per-claim citation check: verify each cited sentence is supported by its passage (a direct counter to subtle poisoning)
+- [ ] Cross-encoder re-ranking on top of hybrid retrieval
 - [x] Conversation memory — follow-ups ("tell me more", "does it also attack PDFs?") are rewritten into standalone questions against the last 4 answered turns before retrieval. Heuristic pre-filter skips the rewrite call for standalone questions; if the LLM is unreachable, memory degrades to a lexical fallback instead of breaking. Refusals/errors don't pollute context.
 - [x] Hybrid search (BM25 + vectors, fused with Reciprocal Rank Fusion) — retrieval hit-rate went from 96% to **100%** on the eval set; the one case pure-vector retrieval missed is now caught by keyword matching. Set `HYBRID_SEARCH=0` to compare.
 - [x] Docker setup (`docker compose up --build`) — deployment stays local on purpose: the privacy story ("documents never leave your machine") *is* the differentiator
