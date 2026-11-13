@@ -181,8 +181,10 @@ def _prepare(query: str, top_k: int) -> tuple[RagResult | None, list[RetrievedCh
 
     hits = retrieve(query, top_k=top_k)
 
-    # Refusal: nothing retrieved is close enough to ground an answer.
-    if not hits or hits[0].distance > RETRIEVAL_MAX_DISTANCE:
+    # Refusal: nothing retrieved is close enough to ground an answer. Uses the
+    # CLOSEST passage, not hits[0]: with hybrid retrieval the top fused result
+    # can be a keyword match that sits farther away than a strong vector match.
+    if not hits or min(h.distance for h in hits) > RETRIEVAL_MAX_DISTANCE:
         return RagResult(answer=REFUSAL_TEXT, sources=hits, refused=True), hits
     return None, hits
 

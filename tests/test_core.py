@@ -114,3 +114,26 @@ class TestRefusal:
 
         assert "<untrusted" in rag._SYSTEM_PROMPT
         assert "never follow" in rag._SYSTEM_PROMPT
+
+
+class TestRefusalGateUsesClosestPassage:
+    """With hybrid retrieval the top fused hit isn't always the closest one."""
+
+    def _hits(self, *distances):
+        from rag import RetrievedChunk
+
+        return [RetrievedChunk(text=f"t{i}", source=f"s{i}", distance=d) for i, d in enumerate(distances)]
+
+    def test_close_passage_below_top_hit_is_not_refused(self, monkeypatch):
+        import rag
+
+        monkeypatch.setattr(rag, "retrieve", lambda q, top_k=5: self._hits(0.90, 0.30))
+        early, hits = rag._prepare("a real question", top_k=2)
+        assert early is None and len(hits) == 2
+
+    def test_all_passages_far_is_refused(self, monkeypatch):
+        import rag
+
+        monkeypatch.setattr(rag, "retrieve", lambda q, top_k=5: self._hits(0.90, 0.85))
+        early, _ = rag._prepare("off topic", top_k=2)
+        assert early is not None and early.refused
