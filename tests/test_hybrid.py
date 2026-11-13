@@ -135,3 +135,51 @@ class TestRetrieveWiring:
         )
         monkeypatch.setattr(rag, "get_collection", lambda: FakeCollection({}))
         assert rag.retrieve("anything") == []
+
+
+class TestRetrieveHybridRealCollection:
+    """End-to-end over a real (in-memory) ChromaDB collection — no fakes.
+
+    Regression: when BM25 surfaced a chunk the vector search did not return,
+    retrieve_hybrid crashed unpacking collection.get()'s result dict.
+    """
+
+    def test_bm25_only_chunk_is_returned_with_true_distance(self, monkeypatch):
+        import uuid
+
+        import chromadb
+        import numpy as np
+
+        import retrieval
+
+        client = chromadb.EphemeralClient()
+        col = client.get_or_create_collection(
+            f"t-{uuid.uuid4().hex}", embedding_function=None, metadata={"hnsw:space": "cosine"}
+        )
+        query_vec = [1.0, 0.0, 0.0]
+        # 7 fillers point near the query, so they fill the vector side's 6 slots...
+        ids = [f"f{i}" for i in range(7)]
+        docs = [f"generic filler text number {i}" for i in range(7)]
+        embs = [[1.0, 0.05 * (i + 1), 0.0] for i in range(7)]
+        # ...and one keyword-only chunk points away from it (vector search misses it).
+        ids.append("kw")
+        docs.append("the zebracorn keyword lives only here")
+        embs.append([0.0, 0.0, 1.0])
+        col.add(ids=ids, documents=docs, embeddings=embs,
+                metadatas=[{"source": f"{cid}.md"} for cid in ids])
+
+        monkeypatch.setattr(retrieval, "get_collection", lambda: col)
+        monkeypatch.setattr(retrieval, "embed_query", lambda q: query_vec)
+        retrieval.invalidate_bm25()
+        try:
+            hits = retrieval.retrieve_hybrid("zebracorn", top_k=3)
+        finally:
+            retrieval.invalidate_bm25()
+
+        by_id = {h["id"]: h for h in hits}
+        assert "kw" in by_id, "BM25-only chunk should be fused into the results"
+        kw = by_id["kw"]
+        assert kw["text"] == "the zebracorn keyword lives only here"
+        assert kw["source"] == "kw.md"
+        # true cosine distance between [1,0,0] and [0,0,1] is 1.0
+        assert np.isclose(kw["distance"], 1.0)
