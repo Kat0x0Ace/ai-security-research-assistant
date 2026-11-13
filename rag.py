@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from config import LLM_TEMPERATURE, LLM_TOP_K, OLLAMA_MODEL, RETRIEVAL_MAX_DISTANCE, get_collection, get_llm_client
 from ingest.embedder import embed_query
 from observability import Timer, log_turn
+from retrieval import hybrid_enabled, retrieve_hybrid
 
 REFUSAL_TEXT = (
     "I don't have relevant material in my knowledge base to answer that "
@@ -92,7 +93,17 @@ class RagResult:
 
 
 def retrieve(query: str, top_k: int = LLM_TOP_K) -> list[RetrievedChunk]:
-    """Embed the query and return the closest chunks (closest first)."""
+    """Embed the query and return the closest chunks (closest first).
+
+    Hybrid by default: vector search fused with BM25 via RRF (see retrieval.py);
+    set HYBRID_SEARCH=0 for pure-vector behavior.
+    """
+    if hybrid_enabled():
+        hits = [
+            RetrievedChunk(text=h["text"], source=h["source"], distance=h["distance"])
+            for h in retrieve_hybrid(query, top_k=top_k)
+        ]
+        return hits
     collection = get_collection()
     if collection.count() == 0:
         return []

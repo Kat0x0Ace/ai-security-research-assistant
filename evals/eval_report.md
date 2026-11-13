@@ -1,7 +1,7 @@
 # Retrieval eval report — sample-corpus-retrieval
 
 - Cases: 25 (top_k=3)
-- Hit rate: **96.0%**
+- Hit rate: **100.0%**
 
 | # | Question | Expected source | Hit |
 |---|----------|-----------------|-----|
@@ -9,7 +9,7 @@
 | 2 | What is the difference between direct and indirect prompt injection? | prompt-injection-basics.md | ✅ |
 | 3 | Why do large language models fall for instructions hidden in data? | prompt-injection-basics.md | ✅ |
 | 4 | Which OWASP risk number is prompt injection? | prompt-injection-basics.md | ✅ |
-| 5 | How can an attacker poison a retrieval-augmented generation knowledge base? | indirect-injection-rag-poisoning.md | ❌ |
+| 5 | How can an attacker poison a retrieval-augmented generation knowledge base? | indirect-injection-rag-poisoning.md | ✅ |
 | 6 | What is RAG poisoning? | indirect-injection-rag-poisoning.md | ✅ |
 | 7 | How can hidden instructions be planted in a PDF or markdown document? | indirect-injection-rag-poisoning.md | ✅ |
 | 8 | Does citation enforcement help against indirect prompt injection? | indirect-injection-rag-poisoning.md | ✅ |
