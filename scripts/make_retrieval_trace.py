@@ -1,12 +1,12 @@
-"""Generate docs/demo.gif from REAL retrieval runs against the live index.
+"""Generate docs/retrieval-trace.gif from REAL retrieval runs against the live index.
 
 No LLM answers here (that needs Ollama running); each frame shows an actual
 retrieval trace: the question, the top-k chunks with cosine distances, whether
 the turn would answer or refuse at RETRIEVAL_MAX_DISTANCE, and the citations
 the UI would display. Run from the repo root:
 
-    python scripts/make_demo_gif.py          # writes docs/demo.gif
-    python scripts/make_demo_gif.py --still  # also writes docs/demo_still.png
+    python scripts/make_retrieval_trace.py          # writes docs/retrieval-trace.gif
+    python scripts/make_retrieval_trace.py --still  # also writes docs/retrieval-trace.png
 """
 
 from __future__ import annotations
@@ -117,11 +117,11 @@ def main() -> None:
         frames.append(frame(i, len(QUESTIONS), q, hits, refused))
         print(f"[demo] {i}/{len(QUESTIONS)}  {q!r}  hits={len(hits)}  refused={refused}")
 
-    gif = out_dir / "demo.gif"
+    gif = out_dir / "retrieval-trace.gif"
     frames[0].save(gif, save_all=True, append_images=frames[1:], duration=2600, loop=0)
     print(f"[demo] wrote {gif}")
     if args.still:
-        still = out_dir / "demo_still.png"
+        still = out_dir / "retrieval-trace.png"
         frames[0].save(still)
         print(f"[demo] wrote {still}")
 

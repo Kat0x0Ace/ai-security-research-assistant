@@ -46,8 +46,8 @@ ui/                     # render.py (escape-first HTML), sidebar.py, knowledge_b
 static/fonts/           # self-hosted fonts + their OFL licenses
 evals/                  # run_eval.py (retrieval, CI gate), injection_eval.py (live red-team) + reports
 tests/                  # unit tests (no LLM needed)
-scripts/                # take_screenshots.py, make_demo_gif.py (dev-only)
-docs/                   # README images: screenshots/, demo.gif
+scripts/                # take_screenshots.py, record_demo_gif.py, make_retrieval_trace.py (dev-only)
+docs/                   # README images: screenshots/, demo.gif (real app), retrieval-trace.gif
 mockups/                # approved design mockups
 Dockerfile, docker-compose.yml
 data/sample-corpus/     # AI-security sample documents
@@ -99,7 +99,7 @@ streamlit run app.py
 - `python evals/run_eval.py` (must stay ≥ 80%)
 - `python evals/injection_eval.py [--control]` (needs Ollama)
 
-**Screenshots / demo:** `pip install playwright`, then `python scripts/take_screenshots.py`. It uses Edge on Windows; on Mac run `playwright install chromium` and pass `--browser chromium`.
+**Screenshots / demo:** `pip install playwright`, then `python scripts/take_screenshots.py` (stills) and `python scripts/record_demo_gif.py` (demo GIF). Both use Edge on Windows; on Mac run `playwright install chromium` and pass `--browser chromium`.
 
 ## Key settings (`.env`, see `.env.example`)
 

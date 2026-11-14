@@ -163,10 +163,15 @@ sources actually get retrieved.
 
 ## Demo
 
-![Retrieval trace demo](docs/demo.gif)
+![Demo: a streamed, cited answer, the sources panel, small talk and a refusal](docs/demo.gif)
 
-Regenerate it (runs real retrieval against your index, no LLM needed):
-`python scripts/make_demo_gif.py --still`
+A real recording of the app: the answer streams in with citation badges, the sources open with their match strength, "thanks!" gets a reply without a search, and an off-topic question is refused before it reaches the LLM. Regenerate it with `python scripts/record_demo_gif.py` (needs Ollama and Playwright).
+
+### Under the hood: the retrieval step
+
+![Retrieval trace: the passages found for each question, their distance, and the answer-or-refuse decision](docs/retrieval-trace.gif)
+
+What happens before the LLM writes anything. For each question: the 3 passages retrieval found, their cosine distance (lower is closer; green is within the refusal cutoff), and the decision. The off-topic question is refused because even its closest passage is too far. Regenerate it with `python scripts/make_retrieval_trace.py` (no LLM needed).
 
 ## Tests and evals
 
@@ -196,7 +201,7 @@ ingest/                 # loader (txt/md/pdf) -> chunker -> embedder (+ SQLite c
 ui/                     # render.py (escape-first HTML), sidebar.py, knowledge_base.py, styles.css
 evals/                  # retrieval eval + prompt-injection red-team, with reports
 tests/                  # unit tests
-scripts/                # demo-GIF generator (real retrieval), screenshot generator
+scripts/                # screenshot, demo-recording and retrieval-trace generators
 data/sample-corpus/     # AI-security sample documents
 ```
 
