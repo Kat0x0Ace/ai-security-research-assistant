@@ -86,7 +86,10 @@ def main() -> int:
             ask(page, "What's the capital of France?")
             page.get_by_text("Outside the knowledge base").wait_for(timeout=180_000)
             wait_idle(page)
-            page.get_by_text("Outside the knowledge base").scroll_into_view_if_needed()
+            # scroll_into_view_if_needed() counts the callout as "visible" even when the
+            # fixed chat input covers it, so centre it explicitly.
+            page.get_by_text("Outside the knowledge base").evaluate("el => el.scrollIntoView({block: 'center'})")
+            page.wait_for_timeout(400)
             page.screenshot(path=OUT / "refusal.png")
             browser.close()
     finally:
