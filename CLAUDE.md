@@ -66,7 +66,8 @@ data/sample-corpus/     # AI-security sample documents
 - ✅ Stronger red-team matrix (poison ranked first, weaker model, controls): defenses cut attack success 2–5×
 - ✅ README accuracy pass + refreshed screenshots and demo GIF
 - ✅ `/security-audit`: 4 findings fixed (network binding, follow-up rewrite, Docker image contents, error details)
-- ⏳ Full-history leak check, publish
+- ✅ Full-history leak check passed
+- ⏳ Make the repo public (owner, in GitHub Settings)
 - Parked (optional): pin CI actions to commit hashes
 
 ## How to run
