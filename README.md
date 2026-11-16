@@ -2,7 +2,9 @@
 
 A local, private RAG assistant that answers questions about AI security **with citations, or an honest "I don't know"**. Embeddings, vector search and the LLM all run on your own machine. No API keys, and no data leaves your machine.
 
-![Cited answer with sources](docs/screenshots/cited-answer.png)
+![Demo: a streamed, cited answer, the sources panel, small talk and a refusal](docs/demo.gif)
+
+*A real recording: the answer streams in with citation badges, the sources open with their match strength, small talk gets a reply without a search, and an off-topic question is refused before it ever reaches the LLM.*
 
 ## Built to be trusted
 
@@ -12,9 +14,7 @@ Most RAG demos stop at "it answers". This one focuses on the three behaviours th
 - **Refusal instead of hallucination.** If nothing in the knowledge base is close enough, it says so without calling the LLM. If the model starts to refuse and then keeps going from memory, the extra text is cut before it reaches the screen.
 - **Treats documents as hostile.** Retrieved passages are wrapped as untrusted data, documents can't forge the wrapper, and everything the model outputs is HTML-escaped before display. A poisoned document can't inject scripts or exfiltrate data through markdown images.
 
-| Empty state | Small talk + refusal |
-|---|---|
-| ![Empty state](docs/screenshots/empty-state.png) | ![Refusal](docs/screenshots/refusal.png) |
+![Cited answer with sources](docs/screenshots/cited-answer.png)
 
 ## Measured, not guessed
 
@@ -58,7 +58,8 @@ Full results: [`evals/injection_matrix.md`](evals/injection_matrix.md). Renderin
 - **A weaker model is much easier to fool, with or without defenses.** That's why the default stays on the 8B model.
 - **Rates vary run to run** (sampling temperature 0.2). Treat the numbers as rough proportions, not exact rates.
 
-**Self-audit before publishing.** A full security review of this repo found these issues, all fixed:
+<details>
+<summary><b>Self-audit before publishing</b> — a full security review of this repo found 4 issues, all fixed (expand)</summary>
 
 | Found | Risk | Fix |
 |---|---|---|
@@ -68,6 +69,8 @@ Full results: [`evals/injection_matrix.md`](evals/injection_matrix.md). Renderin
 | Uncaught errors showed stack traces | Local file paths (including the OS username) visible in the browser | Error details hidden in the UI; still printed in the terminal |
 
 Known and not applicable: `pip-audit` flags CVEs in ChromaDB 1.5.9, all in ChromaDB's standalone HTTP server. This app uses ChromaDB embedded in-process and never runs that server.
+
+</details>
 
 ## How it works
 
@@ -146,32 +149,18 @@ Inside Docker, Ollama can't use an integrated GPU, so answers run at CPU speed. 
 
 ## Observability
 
-Every turn appends one JSONL record to `cache/query_log.jsonl` (gitignored —
-stays on your machine): the query, retrieved sources with cosine distances,
-refusal/small-talk flags, and latency split into retrieval vs. total. Logged
-best-effort — a broken log file can never break a chat turn.
+Every turn appends one JSONL record to `cache/query_log.jsonl` (gitignored — it stays on your machine): the query, retrieved sources with cosine distances, refusal/small-talk flags, and latency split into retrieval vs. total. Logged best-effort — a broken log file can never break a chat turn.
 
 ```python
-from observability import stats, summarize_line
-summarize_line()   # e.g. "12 turns · refusal rate 8% · retrieval median 14.2ms · total median 2.4s"
-stats()            # totals, refusal rate, median latencies, hit distribution by source
+from observability import summarize_line
+summarize_line()   # "12 turns · refusal rate 8% · retrieval median 14.2ms · total median 2.4s"
 ```
 
-These are the three numbers that tell you whether it's working: refusal rate
-(how often the system admits it doesn't know), retrieval latency, and which
-sources actually get retrieved.
-
-## Demo
-
-![Demo: a streamed, cited answer, the sources panel, small talk and a refusal](docs/demo.gif)
-
-A real recording of the app: the answer streams in with citation badges, the sources open with their match strength, "thanks!" gets a reply without a search, and an off-topic question is refused before it reaches the LLM. Regenerate it with `python scripts/record_demo_gif.py` (needs Ollama and Playwright).
-
-### Under the hood: the retrieval step
+## Under the hood: the retrieval step
 
 ![Retrieval trace: the passages found for each question, their distance, and the answer-or-refuse decision](docs/retrieval-trace.gif)
 
-What happens before the LLM writes anything. For each question: the 3 passages retrieval found, their cosine distance (lower is closer; green is within the refusal cutoff), and the decision. The off-topic question is refused because even its closest passage is too far. Regenerate it with `python scripts/make_retrieval_trace.py` (no LLM needed).
+What happens before the LLM writes anything. For each question: the 3 passages retrieval found, their cosine distance (lower is closer; green is within the refusal cutoff), and the decision. The off-topic question is refused because even its closest passage is too far.
 
 ## Tests and evals
 
@@ -186,7 +175,7 @@ python evals/injection_eval.py --matrix    # full grid: models x defended/contro
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the unit tests and the retrieval eval on every push. The red-team needs a running LLM, so it runs locally; its latest reports are committed in [`evals/`](evals/).
 
-To regenerate the screenshots: `pip install playwright`, then `python scripts/take_screenshots.py`. This drives the real app in headless Edge.
+To regenerate the README media: `pip install playwright`, then `python scripts/take_screenshots.py` (stills), `python scripts/record_demo_gif.py` (the demo recording, needs Ollama) and `python scripts/make_retrieval_trace.py` (the retrieval trace, no LLM needed). The first two drive the real app in a headless browser.
 
 ## Project layout
 
@@ -207,12 +196,9 @@ data/sample-corpus/     # AI-security sample documents
 
 ## Known limitations and roadmap
 
-- **Subtle poisoning gets through the prompt layer.** A false fact written like normal content can be repeated, but it is cited to its source, so it's traceable (see Security model).
-- [ ] Per-claim citation check: verify each cited sentence is supported by its passage (a direct counter to subtle poisoning)
-- [ ] Cross-encoder re-ranking on top of hybrid retrieval
-- [x] Conversation memory — follow-ups ("tell me more", "does it also attack PDFs?") are rewritten into standalone questions against the last 4 answered turns before retrieval. Heuristic pre-filter skips the rewrite call for standalone questions; if the LLM is unreachable, memory degrades to a lexical fallback instead of breaking. Refusals/errors don't pollute context.
-- [x] Hybrid search (BM25 + vectors, fused with Reciprocal Rank Fusion) — retrieval hit-rate went from 96% to **100%** on the eval set; the one case pure-vector retrieval missed is now caught by keyword matching. Set `HYBRID_SEARCH=0` to compare.
-- [x] Docker setup (`docker compose up --build`) — deployment stays local on purpose: the privacy story ("documents never leave your machine") *is* the differentiator
+- **Subtle poisoning gets through the prompt layer.** A false fact written like normal content can be repeated — but it is cited to its source, so it's traceable (see Security model). No automated check can tell a well-written lie in the corpus from a fact; citations are the mitigation.
+- [ ] Per-claim citation check: after the answer streams, verify each cited sentence against the passage it cites and flag unsupported claims. This catches hallucinated or injected claims; a lie planted in the corpus is still "supported" by its passage, which is why citations, not this check, are the answer to subtle poisoning.
+- [ ] Cross-encoder re-ranking on top of hybrid retrieval (parked while the retrieval eval sits at 100% — there's nothing to measure an improvement against)
 
 ## License
 
