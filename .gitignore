@@ -18,6 +18,8 @@ build/
 data/*
 !data/sample-corpus/
 cache/
+# private session log (working-process notes stay off the public repo)
+SESSION_LOG.md
 # editor
 .vscode/
 .idea/
