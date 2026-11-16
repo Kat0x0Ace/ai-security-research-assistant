@@ -113,6 +113,20 @@
 .bar { width: 64px; height: 4px; background: var(--line); border-radius: 2px; margin-top: 6px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--teal); }
 
+/* Citation check line under answers */
+.verify { margin-top: 8px; }
+.verify.ok, .verify.dim { font-family: var(--mono); font-size: 12px; }
+.verify.ok { color: var(--teal); }
+.verify.dim { color: var(--faint); }
+.verify.warn { border: 1px solid rgba(201, 115, 79, 0.35); background: var(--clay-soft); border-radius: 10px; padding: 12px 14px; }
+.verify.warn .tag {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--clay); margin-bottom: 4px;
+}
+.verify.warn ul { margin: 0 0 6px; padding-left: 18px; color: var(--text); }
+.verify.warn li { font-size: 13.5px; line-height: 1.5; }
+.verify.warn p { margin: 0; font-size: 12.5px; color: var(--muted); }
+
 /* Refusal + error callouts */
 .refusal, .app-error { border-radius: 10px; padding: 14px 16px; }
 .refusal { border: 1px solid rgba(201, 115, 79, 0.35); background: var(--clay-soft); }
