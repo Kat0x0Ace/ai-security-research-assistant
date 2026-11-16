@@ -103,6 +103,34 @@ def error_html(message: str) -> str:
     return f'<div class="app-error"><div class="tag">Something went wrong</div><p>{html.escape(message)}</p></div>'
 
 
+def verification_html(verification: dict | None) -> str:
+    """One line under an answer with the citation-check outcome.
+
+    `verification` is {"status", "checked", "flagged"} (see app.py). Flagged
+    sentences are untrusted model output — escaped like everything else here.
+    """
+    if not verification:
+        return ""
+    status = verification.get("status")
+    checked = verification.get("checked", 0)
+    if status == "ok":
+        noun = "claim" if checked == 1 else "claims"
+        return f'<div class="verify ok">✓ {checked} cited {noun} checked against their sources</div>'
+    if status == "flagged":
+        items = "".join(f"<li>{html.escape(s)}</li>" for s in verification.get("flagged", []))
+        return (
+            '<div class="verify warn"><div class="tag">Not supported by the cited source</div>'
+            f"<ul>{items}</ul>"
+            "<p>The cited passage doesn't back these sentences up — treat them as unverified.</p></div>"
+        )
+    if status == "uncited":
+        return (
+            '<div class="verify warn"><div class="tag">No citations</div>'
+            "<p>This answer cites no sources, so nothing in it could be checked — treat it with care.</p></div>"
+        )
+    return '<div class="verify dim">Citation check unavailable for this answer.</div>'
+
+
 def match_strength(distance: float) -> tuple[str, int]:
     """Label + bar width (%) for a cosine distance (lower = closer)."""
     label = "strong match" if distance < 0.4 else "good match" if distance < 0.6 else "partial match"

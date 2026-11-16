@@ -14,8 +14,9 @@ from openai import APIConnectionError
 from config import DATA_DIR
 from rag import RagResult, stream_answer
 from ui.knowledge_base import document_titles, source_title
-from ui.render import answer_html, error_html, refusal_html, sources_html, thinking_html, user_bubble_html
+from ui.render import answer_html, error_html, refusal_html, sources_html, thinking_html, user_bubble_html, verification_html
 from ui.sidebar import render_sidebar
+from verify import citation_check_enabled, verify_answer
 from warmup import start_warmup
 
 log = logging.getLogger(__name__)
@@ -86,6 +87,14 @@ def stream_reply(question: str, history: list[tuple[str, str]] | None = None) ->
                     text += piece
                     body.markdown(answer_html(text), unsafe_allow_html=True)
             message = to_message(result)
+            if message["kind"] == "answer" and citation_check_enabled():
+                with st.spinner("Checking citations against their sources…"):
+                    report = verify_answer(result.answer, result.sources)
+                message["verification"] = {
+                    "status": report.status,
+                    "checked": len(report.claims),
+                    "flagged": [c.sentence for c in report.flagged],
+                }
         except APIConnectionError:
             log.exception("Ollama unreachable")
             message = _error("I can't reach Ollama. Make sure the Ollama app is running, then ask again.")
@@ -109,6 +118,9 @@ def render_assistant_body(message: dict) -> None:
         st.markdown(error_html(message["content"]), unsafe_allow_html=True)
     else:
         st.markdown(answer_html(message["content"]), unsafe_allow_html=True)
+        check = verification_html(message.get("verification"))
+        if check:
+            st.markdown(check, unsafe_allow_html=True)
     if message["sources"]:
         with st.expander(f"{len(message['sources'])} sources"):
             st.markdown(sources_html(message["sources"]), unsafe_allow_html=True)

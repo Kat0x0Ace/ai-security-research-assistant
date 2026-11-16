@@ -24,12 +24,12 @@ Core loop: ask a question → get a cited answer in a few seconds → open the s
 - **LLM**: Ollama `llama3.1:8b` through its OpenAI-compatible endpoint (swappable via `.env`).
 - **UI**: Streamlit 1.66, custom "analyst's dossier" theme, fonts self-hosted in `static/fonts`.
 - **Packaging**: Docker (`Dockerfile` + `docker-compose.yml`, Ollama runs as a sibling container).
-- **Tests**: pytest (87 tests), retrieval eval, live prompt-injection red-team; GitHub Actions CI.
+- **Tests**: pytest (117 tests), retrieval eval, citation-check eval, live prompt-injection red-team; GitHub Actions CI.
 - **Lang**: Python 3.11+ (developed on 3.14, CI and Docker on 3.12).
 
 ## Architecture in one paragraph
 
-`config.py` holds settings and lazy singletons (embedding model behind a lock, Chroma, Ollama client). `ingest/` loads txt/md/pdf → chunks into single-line word windows → embeds (SQLite cache) → upserts to Chroma. `rag.py` runs a turn: small talk gets a canned reply; follow-ups ("tell me more") are rewritten into standalone questions using recent turns; then `retrieval.py` does hybrid retrieval → refuse if the passage is farther than the cutoff → wrap passages as untrusted data → call the LLM (`answer()` or streamed `stream_answer()`) → truncate refuse-then-hallucinate output. `observability.py` appends one JSONL record per turn to `cache/query_log.jsonl` (gitignored). `ui/render.py` escapes all untrusted text **first**, then adds citation badges; `ui/sidebar.py` and `ui/knowledge_base.py` build the sidebar; `app.py` only wires these together. `warmup.py` loads the embedding model and LLM in the background at launch.
+`config.py` holds settings and lazy singletons (embedding model behind a lock, Chroma, Ollama client). `ingest/` loads txt/md/pdf → chunks into single-line word windows → embeds (SQLite cache) → upserts to Chroma. `rag.py` runs a turn: small talk gets a canned reply; follow-ups ("tell me more") are rewritten into standalone questions using recent turns; then `retrieval.py` does hybrid retrieval → refuse if the passage is farther than the cutoff → wrap passages as untrusted data → call the LLM (`answer()` or streamed `stream_answer()`) → truncate refuse-then-hallucinate output. After the answer, `verify.py` checks each cited sentence against the passage it cites (one batched LLM call, strict JSON-only parse; `CITATION_CHECK=0` disables) and the UI flags unsupported claims. `observability.py` appends one JSONL record per turn to `cache/query_log.jsonl` (gitignored). `ui/render.py` escapes all untrusted text **first**, then adds citation badges; `ui/sidebar.py` and `ui/knowledge_base.py` build the sidebar; `app.py` only wires these together. `warmup.py` loads the embedding model and LLM in the background at launch.
 
 ## Project layout
 
@@ -37,6 +37,7 @@ Core loop: ask a question → get a cited answer in a few seconds → open the s
 app.py                  # Streamlit entry point (wiring only)
 rag.py                  # small talk -> follow-up rewrite -> retrieve -> refusal gate -> cited answer
 retrieval.py            # hybrid retrieval: vector + BM25, fused with RRF
+verify.py               # per-claim citation check (post-answer, one batched LLM call)
 observability.py        # per-turn JSONL query log + stats()
 config.py               # .env settings + lazy singletons
 warmup.py               # background warm-up at launch
@@ -44,7 +45,7 @@ ingest/                 # loader, chunker, embedder, cache, pipeline
 ui/                     # render.py (escape-first HTML), sidebar.py, knowledge_base.py, styles.css
 .streamlit/config.toml  # theme + font faces + static serving
 static/fonts/           # self-hosted fonts + their OFL licenses
-evals/                  # run_eval.py (retrieval, CI gate), injection_eval.py (live red-team) + reports
+evals/                  # run_eval.py (retrieval, CI gate), verify_eval.py (citation check), injection_eval.py (red-team) + reports
 tests/                  # unit tests (no LLM needed)
 scripts/                # take_screenshots.py, record_demo_gif.py, make_retrieval_trace.py (dev-only)
 docs/                   # README images: screenshots/, demo.gif (real app), retrieval-trace.gif
@@ -67,6 +68,8 @@ data/sample-corpus/     # AI-security sample documents
 - ✅ README accuracy pass + refreshed screenshots and demo GIF
 - ✅ `/security-audit`: 4 findings fixed (network binding, follow-up rewrite, Docker image contents, error details)
 - ✅ Full-history leak check passed
+- ✅ README decrowding pass (demo GIF is the hero, self-audit folded, roadmap pruned)
+- ✅ Per-claim citation check (verify.py): 24/25 fabricated cited claims flagged, 2 false flags on 25 grounded answers, ~2.7s per check
 - ⏳ Make the repo public (owner, in GitHub Settings)
 - Parked (optional): pin CI actions to commit hashes
 
@@ -107,6 +110,7 @@ streamlit run app.py
 - `LLM_TOP_K=3`: was 5. Reading 5 passages roughly tripled latency with no quality gain.
 - `OLLAMA_MODEL=llama3.1:8b`: don't swap to a smaller model without re-running the refusal checks (see lessons).
 - `HYBRID_SEARCH=1` (default): set `0` for vector-only retrieval.
+- `CITATION_CHECK=1` (default): post-answer per-claim citation check; `0` skips the extra LLM call (~2.7s per answer).
 
 ## Security posture
 
@@ -115,6 +119,7 @@ streamlit run app.py
 - All model output, excerpts and titles are HTML-escaped before display. Markdown links and images never render (exfiltration guard).
 - Off-topic questions never reach the LLM. Refuse-then-answer output is truncated, including while streaming.
 - The query log stores question text **locally** (`cache/`, gitignored). It never leaves the machine.
+- The citation check (verify.py) treats both the claims (model output) and the passages (document text) as untrusted: both are neutralized and wrapped, and the verifier's reply must parse as a strict JSON array of booleans — anything else reports "unverified", never a pass. The verifier is precision-biased ("if unsure, supported"): a false "unsupported" flag on a correct answer erodes trust, and fabricated facts are still clearly absent and get caught.
 - Streamlit binds `127.0.0.1` only (`.streamlit/config.toml`); Docker publishes `127.0.0.1:8501`. Error details are hidden in the UI.
 - Follow-up rewriting sees only the user's earlier **questions**, never answers (answers can quote poisoned documents); rewrite output is validated (one line, ≤200 chars, no URLs).
 - `.dockerignore` keeps `data/` (except the sample corpus), `cache/`, `.env` and `.venv` out of the image; the container runs as non-root.
