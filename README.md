@@ -1,5 +1,7 @@
 # AI Security Research Assistant
 
+[![CI](https://github.com/Kat0x0Ace/ai-security-research-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/Kat0x0Ace/ai-security-research-assistant/actions/workflows/ci.yml)
+
 A local, private RAG assistant that answers questions about AI security **with citations, or an honest "I don't know"**. Embeddings, vector search and the LLM all run on your own machine. No API keys, and no data leaves your machine.
 
 ![Demo: a streamed, cited answer, the sources panel, small talk and a refusal](docs/demo.gif)
